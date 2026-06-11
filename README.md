@@ -11,14 +11,27 @@ Personal finance tracker — charts, budgets, month filters, and secure multi-us
 | Frontend | Next.js 15, React 19, TypeScript, Tailwind CSS |
 | Auth | JWT (access + refresh tokens), bcrypt |
 | CI | GitHub Actions |
+| AI Orchestrator | FastAPI orchestrator → LangGraph (phase 2) |
+| LLM | Ollama (local, $0) |
+| RAG | Qdrant (local) |
+| Observability | Phoenix (profile `ai`) |
+| Deploy | Docker, Vercel/Cloudflare (planned) |
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full $0 AI stack mapping.
 
 ## Project structure
 
 ```
 banviro/
-├── backend/          # FastAPI API
-├── frontend/         # Next.js web app
-├── docker-compose.yml
+├── backend/
+│   ├── app/
+│   │   ├── ai/           # Orchestrator, LLM, RAG
+│   │   ├── mcp/          # MCP-style tools
+│   │   └── api/          # REST routes
+├── frontend/             # Next.js web app
+├── docs/ARCHITECTURE.md
+├── docker-compose.yml    # core (db + api)
+├── docker-compose.ai.yml # optional AI services
 └── .github/workflows/ci.yml
 ```
 
@@ -55,6 +68,31 @@ npm run dev
 
 App: http://localhost:3000
 
+### 4. AI stack (optional, $0 local)
+
+**Varianta A — Ollama nativ pe Mac (recomandat, fără Docker profiles):**
+
+```bash
+brew install ollama
+ollama serve          # Terminal separat, lasă-l pornit
+ollama pull llama3.2  # Terminal nou
+```
+
+**Varianta B — AI services în Docker (2 fișiere compose):**
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.ai.yml up -d
+docker exec -it banviro-ollama ollama pull llama3.2
+```
+
+Pe Docker vechi, înlocuiește `docker compose` cu `docker-compose`.
+
+- Ollama: http://localhost:11434
+- Qdrant: http://localhost:6333
+- Phoenix: http://localhost:6006
+- AI status: http://localhost:8000/api/v1/ai/status
+- Chat: `POST /api/v1/ai/chat` `{ "message": "..." }` (Bearer token)
+
 ## API endpoints (v1)
 
 | Method | Path | Description |
@@ -72,6 +110,8 @@ App: http://localhost:3000
 | GET | `/api/v1/finance/analytics/monthly-trend` | Bar chart data (6 months) |
 | GET | `/api/v1/finance/analytics/balance-trend` | Balance evolution (6 months) |
 | GET/PUT/DELETE | `/api/v1/finance/budgets` | Monthly budgets per category |
+| GET | `/api/v1/ai/status` | AI layer health |
+| POST | `/api/v1/ai/chat` | Finance AI advisor |
 
 ## GitHub setup
 
@@ -94,7 +134,9 @@ git push -u origin main
 - [x] Transactions & categories (CRUD)
 - [x] Charts & dashboard metrics
 - [x] Month filter + balance trend + budgets
-- [ ] Chatbot AI advisor (RAG)
+- [x] AI layer scaffold (Ollama + Qdrant + orchestrator)
+- [ ] Chat UI in dashboard
+- [ ] LangGraph agent + Qdrant indexing
 - [ ] Stripe subscriptions
 - [ ] Production deploy pipeline
 - [ ] MFA & enhanced security hardening

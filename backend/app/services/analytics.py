@@ -87,6 +87,7 @@ def get_spending_by_category(
         db.query(
             Category.id,
             Category.name,
+            Category.slug,
             Category.color,
             func.coalesce(func.sum(Transaction.amount), 0).label("amount"),
         )
@@ -97,7 +98,7 @@ def get_spending_by_category(
             extract("month", Transaction.transaction_date) == month,
             extract("year", Transaction.transaction_date) == year,
         )
-        .group_by(Category.id, Category.name, Category.color)
+        .group_by(Category.id, Category.name, Category.slug, Category.color)
         .order_by(func.sum(Transaction.amount).desc())
         .all()
     )
@@ -106,6 +107,7 @@ def get_spending_by_category(
         CategoryBreakdownItem(
             category_id=row.id,
             category_name=row.name,
+            category_slug=row.slug,
             color=row.color,
             amount=Decimal(str(row.amount)),
         )
@@ -207,6 +209,7 @@ def get_budget_progress(
                 id=budget.id,
                 category_id=budget.category_id,
                 category_name=budget.category.name,
+                category_slug=budget.category.slug,
                 color=budget.category.color,
                 budget_amount=budget.amount,
                 spent_amount=spent_amount,

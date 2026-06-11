@@ -12,8 +12,16 @@ class CategoryRead(BaseModel):
 
     id: int
     name: str
+    slug: str | None = None
     type: CategoryType
     color: str
+    user_id: int | None = None
+
+
+class CategoryCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    type: CategoryType
+    color: str = Field(default="#64748b", pattern=r"^#[0-9a-fA-F]{6}$")
 
 
 class TransactionCreate(BaseModel):
@@ -47,6 +55,7 @@ class SummaryStats(BaseModel):
 class CategoryBreakdownItem(BaseModel):
     category_id: int
     category_name: str
+    category_slug: str | None = None
     color: str
     amount: Decimal
 
@@ -73,6 +82,7 @@ class BudgetProgressItem(BaseModel):
     id: int
     category_id: int
     category_name: str
+    category_slug: str | None = None
     color: str
     budget_amount: Decimal
     spent_amount: Decimal

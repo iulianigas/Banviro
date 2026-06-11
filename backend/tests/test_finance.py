@@ -21,6 +21,89 @@ def _register_and_login(email: str | None = None, password: str = "Test1234") ->
     return response.json()["access_token"]
 
 
+def test_custom_category_crud() -> None:
+    token = _register_and_login()
+    headers = {"Authorization": f"Bearer {token}"}
+
+    create_response = client.post(
+        "/api/v1/finance/categories",
+        headers=headers,
+        json={"name": "Gym", "type": "expense", "color": "#2563eb"},
+    )
+    assert create_response.status_code == 201
+    category = create_response.json()
+    assert category["name"] == "Gym"
+    assert category["user_id"] is not None
+    assert category["slug"] is None
+
+    categories = client.get("/api/v1/finance/categories?type=expense", headers=headers)
+    assert any(item["id"] == category["id"] for item in categories.json())
+
+    delete_response = client.delete(
+        f"/api/v1/finance/categories/{category['id']}",
+        headers=headers,
+    )
+    assert delete_response.status_code == 204
+
+
+def test_soft_delete_category_with_transactions() -> None:
+    token = _register_and_login()
+    headers = {"Authorization": f"Bearer {token}"}
+
+    create_response = client.post(
+        "/api/v1/finance/categories",
+        headers=headers,
+        json={"name": "Hobby", "type": "expense", "color": "#2563eb"},
+    )
+    assert create_response.status_code == 201
+    category_id = create_response.json()["id"]
+
+    create_tx = client.post(
+        "/api/v1/finance/transactions",
+        headers=headers,
+        json={
+            "category_id": category_id,
+            "amount": "50.00",
+            "type": "expense",
+            "transaction_date": date.today().isoformat(),
+        },
+    )
+    assert create_tx.status_code == 201
+
+    delete_response = client.delete(
+        f"/api/v1/finance/categories/{category_id}",
+        headers=headers,
+    )
+    assert delete_response.status_code == 204
+
+    categories = client.get("/api/v1/finance/categories?type=expense", headers=headers)
+    assert not any(item["id"] == category_id for item in categories.json())
+
+    transactions = client.get("/api/v1/finance/transactions", headers=headers)
+    assert transactions.status_code == 200
+    tx = next(item for item in transactions.json() if item["category_id"] == category_id)
+    assert tx["category"]["name"] == "Hobby"
+
+    reuse_response = client.post(
+        "/api/v1/finance/transactions",
+        headers=headers,
+        json={
+            "category_id": category_id,
+            "amount": "10.00",
+            "type": "expense",
+            "transaction_date": date.today().isoformat(),
+        },
+    )
+    assert reuse_response.status_code == 404
+
+    recreate_response = client.post(
+        "/api/v1/finance/categories",
+        headers=headers,
+        json={"name": "Hobby", "type": "expense", "color": "#2563eb"},
+    )
+    assert recreate_response.status_code == 201
+
+
 def test_categories_and_transaction_flow() -> None:
     token = _register_and_login()
     headers = {"Authorization": f"Bearer {token}"}

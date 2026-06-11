@@ -3,6 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.config import settings
+from app.logging_config import configure_logging
+
+configure_logging()
 
 app = FastAPI(
     title="Banviro API",

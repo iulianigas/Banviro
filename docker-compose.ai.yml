@@ -1,0 +1,33 @@
+# AI stack — merge with: docker compose -f docker-compose.yml -f docker-compose.ai.yml up -d
+# Or on older Docker: docker-compose -f docker-compose.yml -f docker-compose.ai.yml up -d
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: banviro-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: banviro-qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    container_name: banviro-phoenix
+    restart: unless-stopped
+    ports:
+      - "6006:6006"
+      - "4317:4317"
+
+volumes:
+  ollama_data:
+  qdrant_data:

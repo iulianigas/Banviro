@@ -11,6 +11,18 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
     environment: str = "development"
 
+    # AI layer ($0 stack)
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "llama3.2:1b"
+    ollama_timeout_seconds: int = 120
+    ollama_num_predict: int = 200
+    ollama_keep_alive: str = "30m"
+    ollama_temperature: float = 0.2
+    qdrant_url: str = "http://localhost:6333"
+    qdrant_collection: str = "banviro_transactions"
+    ai_enabled: bool = True
+    phoenix_endpoint: str = "http://localhost:6006"
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

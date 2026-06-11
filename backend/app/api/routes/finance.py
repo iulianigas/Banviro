@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload
@@ -14,6 +14,7 @@ from app.schemas.finance import (
     BudgetProgressItem,
     BudgetUpsert,
     CategoryBreakdownItem,
+    CategoryCreate,
     CategoryRead,
     MonthlyTrendItem,
     SummaryStats,
@@ -44,6 +45,7 @@ def _get_category_for_user(db: Session, category_id: int, user_id: int) -> Categ
         db.query(Category)
         .filter(
             Category.id == category_id,
+            Category.deleted_at.is_(None),
             (Category.user_id.is_(None)) | (Category.user_id == user_id),
         )
         .first()
@@ -60,11 +62,69 @@ def list_categories(
     current_user: User = Depends(get_current_user),
 ) -> list[Category]:
     query = db.query(Category).filter(
-        (Category.user_id.is_(None)) | (Category.user_id == current_user.id)
+        Category.deleted_at.is_(None),
+        (Category.user_id.is_(None)) | (Category.user_id == current_user.id),
     )
     if tx_type is not None:
         query = query.filter(Category.type == CategoryType(tx_type.value))
-    return query.order_by(Category.name).all()
+    return query.order_by(Category.user_id.is_(None).desc(), Category.name).all()
+
+
+@router.post("/categories", response_model=CategoryRead, status_code=status.HTTP_201_CREATED)
+def create_category(
+    payload: CategoryCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Category:
+    name = payload.name.strip()
+    duplicate = (
+        db.query(Category)
+        .filter(
+            Category.user_id == current_user.id,
+            Category.deleted_at.is_(None),
+            Category.type == payload.type,
+            Category.name.ilike(name),
+        )
+        .first()
+    )
+    if duplicate is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You already have a category with this name",
+        )
+
+    category = Category(
+        name=name,
+        type=payload.type,
+        color=payload.color,
+        user_id=current_user.id,
+    )
+    db.add(category)
+    db.commit()
+    db.refresh(category)
+    return category
+
+
+@router.delete("/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_category(
+    category_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    category = (
+        db.query(Category)
+        .filter(
+            Category.id == category_id,
+            Category.user_id == current_user.id,
+            Category.deleted_at.is_(None),
+        )
+        .first()
+    )
+    if category is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+
+    category.deleted_at = datetime.now(timezone.utc)
+    db.commit()
 
 
 @router.get("/transactions", response_model=list[TransactionRead])
