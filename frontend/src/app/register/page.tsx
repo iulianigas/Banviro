@@ -6,9 +6,11 @@ import { useRouter } from "next/navigation";
 
 import { AuthShell } from "@/components/auth-shell";
 import { registerUser } from "@/lib/api";
+import { useI18n } from "@/lib/i18n/context";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,21 +30,18 @@ export default function RegisterPage() {
       });
       router.push("/login");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Înregistrare eșuată");
+      setError(err instanceof Error ? err.message : t("register.failed"));
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <AuthShell
-      title="Creează cont"
-      subtitle="Începe să-ți urmărești finanțele personale."
-    >
+    <AuthShell title={t("register.title")} subtitle={t("register.subtitle")}>
       <form className="space-y-4" onSubmit={handleSubmit}>
         <div>
           <label htmlFor="fullName" className="mb-1 block text-sm font-medium text-slate-700">
-            Nume complet
+            {t("register.fullName")}
           </label>
           <input
             id="fullName"
@@ -55,7 +54,7 @@ export default function RegisterPage() {
 
         <div>
           <label htmlFor="email" className="mb-1 block text-sm font-medium text-slate-700">
-            Email
+            {t("common.email")}
           </label>
           <input
             id="email"
@@ -69,7 +68,7 @@ export default function RegisterPage() {
 
         <div>
           <label htmlFor="password" className="mb-1 block text-sm font-medium text-slate-700">
-            Parolă
+            {t("common.password")}
           </label>
           <input
             id="password"
@@ -89,14 +88,14 @@ export default function RegisterPage() {
           disabled={loading}
           className="w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
         >
-          {loading ? "Se creează contul..." : "Creează cont"}
+          {loading ? t("register.submitting") : t("register.submit")}
         </button>
       </form>
 
       <p className="mt-6 text-center text-sm text-slate-600">
-        Ai deja cont?{" "}
+        {t("register.hasAccount")}{" "}
         <Link href="/login" className="font-semibold text-brand-600 hover:text-brand-700">
-          Autentifică-te
+          {t("register.signIn")}
         </Link>
       </p>
     </AuthShell>

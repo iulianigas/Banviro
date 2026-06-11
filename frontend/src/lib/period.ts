@@ -1,3 +1,5 @@
+import type { Locale } from "@/lib/i18n/messages";
+
 export type PeriodFilter = {
   month: number;
   year: number;
@@ -13,9 +15,10 @@ export function shiftPeriod(period: PeriodFilter, delta: number): PeriodFilter {
   return { month: date.getMonth() + 1, year: date.getFullYear() };
 }
 
-export function formatPeriodLabel(period: PeriodFilter): string {
+export function formatPeriodLabel(period: PeriodFilter, locale: Locale = "ro"): string {
   const date = new Date(period.year, period.month - 1, 1);
-  return date.toLocaleDateString("ro-RO", { month: "long", year: "numeric" });
+  const intlLocale = locale === "en" ? "en-GB" : "ro-RO";
+  return date.toLocaleDateString(intlLocale, { month: "long", year: "numeric" });
 }
 
 export function periodQuery(period: PeriodFilter): string {

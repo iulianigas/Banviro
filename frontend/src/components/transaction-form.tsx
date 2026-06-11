@@ -3,6 +3,8 @@
 import { FormEvent, useEffect, useState } from "react";
 
 import { Category, createTransaction } from "@/lib/api";
+import { getCategoryLabel } from "@/lib/categories";
+import { useI18n } from "@/lib/i18n/context";
 import { PeriodFilter } from "@/lib/period";
 
 type TransactionFormProps = {
@@ -25,6 +27,7 @@ export function TransactionForm({
   onCreated,
   defaultPeriod,
 }: TransactionFormProps) {
+  const { t } = useI18n();
   const [categories, setCategories] = useState<Category[]>([]);
   const [type, setType] = useState<"income" | "expense">("expense");
   const [categoryId, setCategoryId] = useState("");
@@ -46,8 +49,8 @@ export function TransactionForm({
       setCategoryId(data[0] ? String(data[0].id) : "");
     }
 
-    loadCategories().catch(() => setError("Nu am putut încărca categoriile"));
-  }, [accessToken, type]);
+    loadCategories().catch(() => setError(t("dashboard.categoriesLoadError")));
+  }, [accessToken, type, t]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -68,7 +71,7 @@ export function TransactionForm({
       setDescription("");
       onCreated();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Eroare la salvare");
+      setError(err instanceof Error ? err.message : t("dashboard.saveError"));
     } finally {
       setLoading(false);
     }
@@ -76,22 +79,26 @@ export function TransactionForm({
 
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold text-slate-900">Adaugă tranzacție</h2>
+      <h2 className="text-lg font-semibold text-slate-900">{t("dashboard.addTransaction")}</h2>
       <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Tip</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              {t("dashboard.type")}
+            </label>
             <select
               value={type}
               onChange={(event) => setType(event.target.value as "income" | "expense")}
               className="w-full rounded-lg border border-slate-300 px-3 py-2"
             >
-              <option value="expense">Cheltuială</option>
-              <option value="income">Venit</option>
+              <option value="expense">{t("dashboard.expenseType")}</option>
+              <option value="income">{t("dashboard.incomeType")}</option>
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Categorie</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              {t("dashboard.category")}
+            </label>
             <select
               value={categoryId}
               onChange={(event) => setCategoryId(event.target.value)}
@@ -100,7 +107,7 @@ export function TransactionForm({
             >
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
-                  {category.name}
+                  {getCategoryLabel(category, t)}
                 </option>
               ))}
             </select>
@@ -109,7 +116,9 @@ export function TransactionForm({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Sumă (RON)</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              {t("dashboard.amount")}
+            </label>
             <input
               type="number"
               min="0.01"
@@ -121,7 +130,9 @@ export function TransactionForm({
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Data</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              {t("dashboard.date")}
+            </label>
             <input
               type="date"
               required
@@ -133,12 +144,14 @@ export function TransactionForm({
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Descriere</label>
+          <label className="mb-1 block text-sm font-medium text-slate-700">
+            {t("dashboard.description")}
+          </label>
           <input
             type="text"
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            placeholder="Ex: Cumpărături Kaufland"
+            placeholder={t("dashboard.descriptionPlaceholder")}
             className="w-full rounded-lg border border-slate-300 px-3 py-2"
           />
         </div>
@@ -150,7 +163,7 @@ export function TransactionForm({
           disabled={loading}
           className="rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
         >
-          {loading ? "Se salvează..." : "Salvează tranzacția"}
+          {loading ? t("dashboard.saving") : t("dashboard.saveTransaction")}
         </button>
       </form>
     </article>

@@ -47,8 +47,10 @@ export type TokenPair = {
 export type Category = {
   id: number;
   name: string;
+  slug: string | null;
   type: "income" | "expense";
   color: string;
+  user_id: number | null;
 };
 
 export type Transaction = {
@@ -72,6 +74,7 @@ export type SummaryStats = {
 export type CategoryBreakdown = {
   category_id: number;
   category_name: string;
+  category_slug: string | null;
   color: string;
   amount: string;
 };
@@ -91,6 +94,7 @@ export type BudgetProgress = {
   id: number;
   category_id: number;
   category_name: string;
+  category_slug: string | null;
   color: string;
   budget_amount: string;
   spent_amount: string;
@@ -151,6 +155,34 @@ export async function getCategories(
   });
 
   return parseResponse<Category[]>(response);
+}
+
+export async function createCategory(
+  accessToken: string,
+  payload: {
+    name: string;
+    type: "income" | "expense";
+    color?: string;
+  }
+): Promise<Category> {
+  const response = await fetch(`${API_URL}/api/v1/finance/categories`, {
+    method: "POST",
+    headers: authHeaders(accessToken),
+    body: JSON.stringify(payload),
+  });
+
+  return parseResponse<Category>(response);
+}
+
+export async function deleteCategory(accessToken: string, id: number): Promise<void> {
+  const response = await fetch(`${API_URL}/api/v1/finance/categories/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!response.ok) {
+    await parseResponse(response);
+  }
 }
 
 export async function getTransactions(
@@ -273,4 +305,37 @@ export async function upsertBudget(
   });
 
   return parseResponse<BudgetProgress>(response);
+}
+
+export type AiStatus = {
+  ai_enabled: boolean;
+  ollama_available: boolean;
+  qdrant_available: boolean;
+  model: string;
+};
+
+export type ChatResponse = {
+  reply: string;
+  model: string;
+  used_tools: string[];
+  used_rag: boolean;
+};
+
+export async function getAiStatus(): Promise<AiStatus> {
+  const response = await fetch(`${API_URL}/api/v1/ai/status`);
+  return parseResponse<AiStatus>(response);
+}
+
+export async function sendAiChat(
+  accessToken: string,
+  message: string,
+  locale: "ro" | "en" = "ro"
+): Promise<ChatResponse> {
+  const response = await fetch(`${API_URL}/api/v1/ai/chat`, {
+    method: "POST",
+    headers: authHeaders(accessToken),
+    body: JSON.stringify({ message, locale }),
+  });
+
+  return parseResponse<ChatResponse>(response);
 }

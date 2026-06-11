@@ -7,9 +7,11 @@ import { useRouter } from "next/navigation";
 import { AuthShell } from "@/components/auth-shell";
 import { loginUser } from "@/lib/api";
 import { saveTokens } from "@/lib/auth";
+import { useI18n } from "@/lib/i18n/context";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -25,21 +27,18 @@ export default function LoginPage() {
       saveTokens(tokens.access_token, tokens.refresh_token);
       router.push("/dashboard");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Autentificare eșuată");
+      setError(err instanceof Error ? err.message : t("login.failed"));
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <AuthShell
-      title="Autentificare"
-      subtitle="Intră în contul tău Banviro."
-    >
+    <AuthShell title={t("login.title")} subtitle={t("login.subtitle")}>
       <form className="space-y-4" onSubmit={handleSubmit}>
         <div>
           <label htmlFor="email" className="mb-1 block text-sm font-medium text-slate-700">
-            Email
+            {t("common.email")}
           </label>
           <input
             id="email"
@@ -53,7 +52,7 @@ export default function LoginPage() {
 
         <div>
           <label htmlFor="password" className="mb-1 block text-sm font-medium text-slate-700">
-            Parolă
+            {t("common.password")}
           </label>
           <input
             id="password"
@@ -73,14 +72,14 @@ export default function LoginPage() {
           disabled={loading}
           className="w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
         >
-          {loading ? "Se autentifică..." : "Autentificare"}
+          {loading ? t("login.submitting") : t("login.submit")}
         </button>
       </form>
 
       <p className="mt-6 text-center text-sm text-slate-600">
-        Nu ai cont?{" "}
+        {t("login.noAccount")}{" "}
         <Link href="/register" className="font-semibold text-brand-600 hover:text-brand-700">
-          Înregistrează-te
+          {t("login.register")}
         </Link>
       </p>
     </AuthShell>

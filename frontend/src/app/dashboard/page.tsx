@@ -3,8 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { AiChatPanel } from "@/components/ai-chat-panel";
 import { BalanceTrendChart } from "@/components/balance-trend-chart";
 import { BudgetPanel } from "@/components/budget-panel";
+import { CategoryPanel } from "@/components/category-panel";
+import { LanguageSelector } from "@/components/language-selector";
 import { MonthFilter } from "@/components/month-filter";
 import { MonthlyTrendChart } from "@/components/monthly-trend-chart";
 import { SpendingChart } from "@/components/spending-chart";
@@ -28,10 +31,13 @@ import {
   User,
 } from "@/lib/api";
 import { clearTokens, getAccessToken } from "@/lib/auth";
+import { useI18n } from "@/lib/i18n/context";
+import { translate } from "@/lib/i18n/messages";
 import { formatPeriodLabel, getCurrentPeriod, PeriodFilter } from "@/lib/period";
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { locale, t } = useI18n();
   const [user, setUser] = useState<User | null>(null);
   const [summary, setSummary] = useState<SummaryStats | null>(null);
   const [spending, setSpending] = useState<CategoryBreakdown[]>([]);
@@ -82,8 +88,7 @@ export default function DashboardPage() {
 
     loadDashboard(token, period)
       .catch((err) => {
-        const message =
-          err instanceof Error ? err.message : "Nu am putut încărca datele dashboard-ului";
+        const message = err instanceof Error ? err.message : translate(locale, "dashboard.loadError");
         setError(message);
         if (message.toLowerCase().includes("authenticated") || message.includes("401")) {
           clearTokens();
@@ -91,7 +96,7 @@ export default function DashboardPage() {
         }
       })
       .finally(() => setLoading(false));
-  }, [loadDashboard, period, router]);
+  }, [loadDashboard, period, router, locale]);
 
   function handleLogout() {
     clearTokens();
@@ -105,17 +110,17 @@ export default function DashboardPage() {
     setError(null);
     loadDashboard(token, period)
       .catch((err) => {
-        setError(err instanceof Error ? err.message : "Eroare la reîncărcare");
+        setError(err instanceof Error ? err.message : t("dashboard.reloadError"));
       })
       .finally(() => setLoading(false));
   }
 
-  const periodLabel = formatPeriodLabel(period);
+  const periodLabel = formatPeriodLabel(period, locale);
 
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center">
-        <p className="text-slate-600">Se încarcă dashboard-ul...</p>
+        <p className="text-slate-600">{t("dashboard.loading")}</p>
       </main>
     );
   }
@@ -124,23 +129,20 @@ export default function DashboardPage() {
     return (
       <main className="flex min-h-screen items-center justify-center px-6">
         <div className="max-w-md rounded-2xl border border-red-200 bg-white p-6 text-center shadow-sm">
-          <h1 className="text-lg font-semibold text-slate-900">Dashboard indisponibil</h1>
-          <p className="mt-2 text-sm text-slate-600">
-            {error ??
-              "Datele nu s-au încărcat. Verifică dacă backend-ul rulează și ai rulat migrarea DB."}
-          </p>
+          <h1 className="text-lg font-semibold text-slate-900">{t("dashboard.unavailable")}</h1>
+          <p className="mt-2 text-sm text-slate-600">{error ?? t("dashboard.loadHint")}</p>
           <div className="mt-4 flex flex-wrap justify-center gap-3">
             <button
               onClick={handleRefresh}
               className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
             >
-              Reîncearcă
+              {t("common.retry")}
             </button>
             <button
               onClick={() => router.push("/login")}
               className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
             >
-              Mergi la login
+              {t("dashboard.goToLogin")}
             </button>
           </div>
         </div>
@@ -156,18 +158,21 @@ export default function DashboardPage() {
       <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-brand-600">
-            Banviro Dashboard
+            {t("dashboard.title")}
           </p>
           <h1 className="text-3xl font-bold text-slate-900">
-            Bun venit, {user.full_name ?? user.email}
+            {t("dashboard.welcome", { name: user.full_name ?? user.email })}
           </h1>
         </div>
-        <button
-          onClick={handleLogout}
-          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-        >
-          Deconectare
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <LanguageSelector />
+          <button
+            onClick={handleLogout}
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+          >
+            {t("dashboard.logout")}
+          </button>
+        </div>
       </header>
 
       <div className="space-y-8">
@@ -198,6 +203,10 @@ export default function DashboardPage() {
             onDeleted={handleRefresh}
           />
         </section>
+
+        <CategoryPanel accessToken={token} onChanged={handleRefresh} />
+
+        <AiChatPanel accessToken={token} periodLabel={periodLabel} />
       </div>
     </main>
   );

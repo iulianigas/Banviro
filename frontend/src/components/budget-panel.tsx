@@ -3,7 +3,9 @@
 import { FormEvent, useEffect, useState } from "react";
 
 import { BudgetProgress, Category, getCategories, upsertBudget } from "@/lib/api";
+import { getCategoryLabel } from "@/lib/categories";
 import { formatMoney } from "@/lib/format";
+import { useI18n } from "@/lib/i18n/context";
 import { PeriodFilter } from "@/lib/period";
 
 type BudgetPanelProps = {
@@ -14,6 +16,7 @@ type BudgetPanelProps = {
 };
 
 export function BudgetPanel({ accessToken, period, budgets, onChanged }: BudgetPanelProps) {
+  const { locale, t } = useI18n();
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryId, setCategoryId] = useState("");
   const [amount, setAmount] = useState("");
@@ -26,8 +29,8 @@ export function BudgetPanel({ accessToken, period, budgets, onChanged }: BudgetP
         setCategories(data);
         setCategoryId(data[0] ? String(data[0].id) : "");
       })
-      .catch(() => setError("Nu am putut încărca categoriile"));
-  }, [accessToken]);
+      .catch(() => setError(t("dashboard.categoriesLoadError")));
+  }, [accessToken, t]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -45,7 +48,7 @@ export function BudgetPanel({ accessToken, period, budgets, onChanged }: BudgetP
       setAmount("");
       onChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Eroare la salvarea bugetului");
+      setError(err instanceof Error ? err.message : t("dashboard.budgetSaveError"));
     } finally {
       setLoading(false);
     }
@@ -53,8 +56,8 @@ export function BudgetPanel({ accessToken, period, budgets, onChanged }: BudgetP
 
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold text-slate-900">Bugete lunare</h2>
-      <p className="mt-1 text-sm text-slate-500">Limite pe categorie pentru luna selectată</p>
+      <h2 className="text-lg font-semibold text-slate-900">{t("dashboard.budgets")}</h2>
+      <p className="mt-1 text-sm text-slate-500">{t("dashboard.budgetsHint")}</p>
 
       <form className="mt-4 grid gap-3 sm:grid-cols-[1fr_140px_auto]" onSubmit={handleSubmit}>
         <select
@@ -65,7 +68,7 @@ export function BudgetPanel({ accessToken, period, budgets, onChanged }: BudgetP
         >
           {categories.map((category) => (
             <option key={category.id} value={category.id}>
-              {category.name}
+              {getCategoryLabel(category, t)}
             </option>
           ))}
         </select>
@@ -73,7 +76,7 @@ export function BudgetPanel({ accessToken, period, budgets, onChanged }: BudgetP
           type="number"
           min="1"
           step="0.01"
-          placeholder="Sumă RON"
+          placeholder={t("dashboard.amountRon")}
           value={amount}
           onChange={(event) => setAmount(event.target.value)}
           className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
@@ -84,7 +87,7 @@ export function BudgetPanel({ accessToken, period, budgets, onChanged }: BudgetP
           disabled={loading}
           className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
         >
-          Setează
+          {t("dashboard.setBudget")}
         </button>
       </form>
 
@@ -92,7 +95,7 @@ export function BudgetPanel({ accessToken, period, budgets, onChanged }: BudgetP
 
       <div className="mt-6 space-y-4">
         {budgets.length === 0 ? (
-          <p className="text-sm text-slate-500">Nu ai bugete setate pentru această lună.</p>
+          <p className="text-sm text-slate-500">{t("dashboard.noBudgets")}</p>
         ) : (
           budgets.map((budget) => {
             const percent = Math.min(parseFloat(budget.usage_percent), 100);
@@ -100,9 +103,12 @@ export function BudgetPanel({ accessToken, period, budgets, onChanged }: BudgetP
             return (
               <div key={budget.id}>
                 <div className="mb-1 flex items-center justify-between text-sm">
-                  <span className="font-medium text-slate-800">{budget.category_name}</span>
+                  <span className="font-medium text-slate-800">
+                    {getCategoryLabel(budget, t)}
+                  </span>
                   <span className={isOver ? "font-semibold text-red-600" : "text-slate-600"}>
-                    {formatMoney(budget.spent_amount)} / {formatMoney(budget.budget_amount)}
+                    {formatMoney(budget.spent_amount, locale)} /{" "}
+                    {formatMoney(budget.budget_amount, locale)}
                   </span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-slate-100">
@@ -112,7 +118,10 @@ export function BudgetPanel({ accessToken, period, budgets, onChanged }: BudgetP
                   />
                 </div>
                 <p className="mt-1 text-xs text-slate-500">
-                  {budget.usage_percent}% utilizat · rămas {formatMoney(budget.remaining_amount)}
+                  {t("dashboard.budgetUsed", {
+                    percent: budget.usage_percent,
+                    remaining: formatMoney(budget.remaining_amount, locale),
+                  })}
                 </p>
               </div>
             );

@@ -1,7 +1,9 @@
 "use client";
 
 import { Transaction, deleteTransaction } from "@/lib/api";
+import { getCategoryLabel } from "@/lib/categories";
 import { formatMoney } from "@/lib/format";
+import { useI18n } from "@/lib/i18n/context";
 
 type TransactionListProps = {
   accessToken: string;
@@ -14,6 +16,8 @@ export function TransactionList({
   transactions,
   onDeleted,
 }: TransactionListProps) {
+  const { locale, t } = useI18n();
+
   async function handleDelete(id: number) {
     await deleteTransaction(accessToken, id);
     onDeleted();
@@ -21,9 +25,9 @@ export function TransactionList({
 
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold text-slate-900">Tranzacții recente</h2>
+      <h2 className="text-lg font-semibold text-slate-900">{t("dashboard.recentTransactions")}</h2>
       {transactions.length === 0 ? (
-        <p className="mt-4 text-sm text-slate-500">Nu ai tranzacții încă.</p>
+        <p className="mt-4 text-sm text-slate-500">{t("dashboard.noTransactions")}</p>
       ) : (
         <ul className="mt-4 divide-y divide-slate-100">
           {transactions.map((transaction) => (
@@ -33,10 +37,10 @@ export function TransactionList({
             >
               <div>
                 <p className="font-medium text-slate-900">
-                  {transaction.description || transaction.category.name}
+                  {transaction.description || getCategoryLabel(transaction.category, t)}
                 </p>
                 <p className="text-sm text-slate-500">
-                  {transaction.category.name} · {transaction.transaction_date}
+                  {getCategoryLabel(transaction.category, t)} · {transaction.transaction_date}
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -46,14 +50,14 @@ export function TransactionList({
                   }`}
                 >
                   {transaction.type === "income" ? "+" : "-"}
-                  {formatMoney(transaction.amount)}
+                  {formatMoney(transaction.amount, locale)}
                 </span>
                 <button
                   onClick={() => handleDelete(transaction.id)}
                   className="text-sm text-slate-400 hover:text-red-600"
-                  aria-label="Șterge tranzacția"
+                  aria-label={t("dashboard.deleteTransaction")}
                 >
-                  Șterge
+                  {t("common.delete")}
                 </button>
               </div>
             </li>

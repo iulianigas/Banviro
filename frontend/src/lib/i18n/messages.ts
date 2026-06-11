@@ -1,0 +1,303 @@
+export type Locale = "ro" | "en";
+
+export const messages = {
+  ro: {
+    common: {
+      email: "Email",
+      password: "Parolă",
+      language: "Limbă",
+      retry: "Reîncearcă",
+      delete: "Șterge",
+      save: "Salvează",
+      loading: "Se încarcă...",
+      requestFailed: "Cererea a eșuat",
+    },
+    home: {
+      tagline: "Personal Finance Tracker",
+      description:
+        "Urmărește cheltuielile, vizualizează grafice și primește insight-uri financiare — totul într-un singur loc.",
+      createAccount: "Creează cont",
+      signIn: "Autentificare",
+    },
+    login: {
+      title: "Autentificare",
+      subtitle: "Intră în contul tău Banviro.",
+      submit: "Autentificare",
+      submitting: "Se autentifică...",
+      failed: "Autentificare eșuată",
+      noAccount: "Nu ai cont?",
+      register: "Înregistrează-te",
+    },
+    register: {
+      title: "Creează cont",
+      subtitle: "Începe să-ți urmărești finanțele personale.",
+      fullName: "Nume complet",
+      submit: "Creează cont",
+      submitting: "Se creează contul...",
+      failed: "Înregistrare eșuată",
+      hasAccount: "Ai deja cont?",
+      signIn: "Autentifică-te",
+    },
+    dashboard: {
+      title: "Banviro Dashboard",
+      welcome: "Bun venit, {name}",
+      logout: "Deconectare",
+      loading: "Se încarcă dashboard-ul...",
+      unavailable: "Dashboard indisponibil",
+      loadError: "Nu am putut încărca datele dashboard-ului",
+      loadHint:
+        "Datele nu s-au încărcat. Verifică dacă backend-ul rulează și ai rulat migrarea DB.",
+      reloadError: "Eroare la reîncărcare",
+      goToLogin: "Mergi la login",
+      period: "Perioadă:",
+      prevMonth: "Luna anterioară",
+      nextMonth: "Luna următoare",
+      totalBalance: "Sold total",
+      income: "Venituri",
+      expenses: "Cheltuieli",
+      savings: "Economii",
+      balanceTrend: "Evoluție sold",
+      balanceTrendHint: "Sold cumulativ, ultimele 6 luni",
+      balance: "Sold",
+      spendingByCategory: "Cheltuieli pe categorii",
+      spendingEmpty: "Adaugă cheltuieli ca să vezi distribuția pe categorii.",
+      monthlyTrend: "Evoluție lunară",
+      last6Months: "Ultimele 6 luni",
+      budgets: "Bugete lunare",
+      budgetsHint: "Limite pe categorie pentru luna selectată",
+      amountRon: "Sumă RON",
+      setBudget: "Setează",
+      noBudgets: "Nu ai bugete setate pentru această lună.",
+      budgetUsed: "{percent}% utilizat · rămas {remaining}",
+      categoriesLoadError: "Nu am putut încărca categoriile",
+      budgetSaveError: "Eroare la salvarea bugetului",
+      addTransaction: "Adaugă tranzacție",
+      type: "Tip",
+      expenseType: "Cheltuială",
+      incomeType: "Venit",
+      category: "Categorie",
+      amount: "Sumă (RON)",
+      date: "Data",
+      description: "Descriere",
+      descriptionPlaceholder: "Ex: Cumpărături Kaufland",
+      saving: "Se salvează...",
+      saveTransaction: "Salvează tranzacția",
+      saveError: "Eroare la salvare",
+      recentTransactions: "Tranzacții recente",
+      noTransactions: "Nu ai tranzacții încă.",
+      deleteTransaction: "Șterge tranzacția",
+    },
+    ai: {
+      title: "Asistent financiar AI",
+      subtitle: "Întreabă despre cheltuieli, bugete și trenduri — răspunsuri bazate pe datele tale",
+      checking: "Se verifică...",
+      offline: "AI offline",
+      emptyHint: "Pune o întrebare despre finanțele tale sau alege o sugestie:",
+      promptFinance: "Cum arată situația mea financiară în {period}?",
+      promptCategory: "Pe ce categorie cheltuiesc cel mai mult?",
+      promptBudget: "Am depășit vreun buget luna aceasta?",
+      promptTrend: "Care e trendul balanței mele?",
+      generating: "Generez răspuns... ({seconds}s)",
+      slowHint:
+        "Prima rulare poate dura 1–3 minute (modelul se încarcă în memorie). Loguri: terminal uvicorn + docker logs -f banviro-ollama",
+      sendError: "Eroare la trimiterea mesajului",
+      ollamaOffline: "Ollama nu rulează. Pornește: ollama serve",
+      placeholder: "Ex: Cât am cheltuit pe mâncare luna aceasta?",
+      send: "Trimite",
+      inputHint: "Enter trimite · Shift+Enter linie nouă",
+    },
+    categories: {
+      salary: "Salariu",
+      freelance: "Freelance",
+      investments: "Investiții",
+      other_income: "Alte venituri",
+      rent: "Chirie",
+      food: "Mâncare",
+      transport: "Transport",
+      utilities: "Utilități",
+      shopping: "Shopping",
+      health: "Sănătate",
+      entertainment: "Divertisment",
+      other: "Altele",
+    },
+    categoryPanel: {
+      title: "Categorii",
+      subtitle: "Adaugă categorii personalizate sau folosește cele predefinite",
+      name: "Nume categorie",
+      add: "Adaugă categorie",
+      adding: "Se adaugă...",
+      custom: "Categoriile tale",
+      default: "Predefinite",
+      noCustom: "Nu ai categorii personalizate încă.",
+      addError: "Nu am putut adăuga categoria",
+      deleteError: "Nu am putut șterge categoria",
+      customBadge: "Personală",
+    },
+  },
+  en: {
+    common: {
+      email: "Email",
+      password: "Password",
+      language: "Language",
+      retry: "Retry",
+      delete: "Delete",
+      save: "Save",
+      loading: "Loading...",
+      requestFailed: "Request failed",
+    },
+    home: {
+      tagline: "Personal Finance Tracker",
+      description:
+        "Track spending, visualize charts, and get financial insights — all in one place.",
+      createAccount: "Create account",
+      signIn: "Sign in",
+    },
+    login: {
+      title: "Sign in",
+      subtitle: "Access your Banviro account.",
+      submit: "Sign in",
+      submitting: "Signing in...",
+      failed: "Sign in failed",
+      noAccount: "Don't have an account?",
+      register: "Register",
+    },
+    register: {
+      title: "Create account",
+      subtitle: "Start tracking your personal finances.",
+      fullName: "Full name",
+      submit: "Create account",
+      submitting: "Creating account...",
+      failed: "Registration failed",
+      hasAccount: "Already have an account?",
+      signIn: "Sign in",
+    },
+    dashboard: {
+      title: "Banviro Dashboard",
+      welcome: "Welcome, {name}",
+      logout: "Log out",
+      loading: "Loading dashboard...",
+      unavailable: "Dashboard unavailable",
+      loadError: "Could not load dashboard data",
+      loadHint: "Data did not load. Check that the backend is running and DB migrations are applied.",
+      reloadError: "Reload failed",
+      goToLogin: "Go to login",
+      period: "Period:",
+      prevMonth: "Previous month",
+      nextMonth: "Next month",
+      totalBalance: "Total balance",
+      income: "Income",
+      expenses: "Expenses",
+      savings: "Savings",
+      balanceTrend: "Balance trend",
+      balanceTrendHint: "Cumulative balance, last 6 months",
+      balance: "Balance",
+      spendingByCategory: "Spending by category",
+      spendingEmpty: "Add expenses to see the category breakdown.",
+      monthlyTrend: "Monthly trend",
+      last6Months: "Last 6 months",
+      budgets: "Monthly budgets",
+      budgetsHint: "Category limits for the selected month",
+      amountRon: "Amount RON",
+      setBudget: "Set",
+      noBudgets: "No budgets set for this month.",
+      budgetUsed: "{percent}% used · {remaining} left",
+      categoriesLoadError: "Could not load categories",
+      budgetSaveError: "Failed to save budget",
+      addTransaction: "Add transaction",
+      type: "Type",
+      expenseType: "Expense",
+      incomeType: "Income",
+      category: "Category",
+      amount: "Amount (RON)",
+      date: "Date",
+      description: "Description",
+      descriptionPlaceholder: "e.g. Grocery shopping",
+      saving: "Saving...",
+      saveTransaction: "Save transaction",
+      saveError: "Save failed",
+      recentTransactions: "Recent transactions",
+      noTransactions: "No transactions yet.",
+      deleteTransaction: "Delete transaction",
+    },
+    ai: {
+      title: "AI financial assistant",
+      subtitle: "Ask about spending, budgets, and trends — answers based on your data",
+      checking: "Checking...",
+      offline: "AI offline",
+      emptyHint: "Ask a question about your finances or pick a suggestion:",
+      promptFinance: "How does my financial situation look in {period}?",
+      promptCategory: "Which category do I spend the most on?",
+      promptBudget: "Did I exceed any budget this month?",
+      promptTrend: "What is my balance trend?",
+      generating: "Generating response... ({seconds}s)",
+      slowHint:
+        "First run may take 1–3 minutes (model loading into memory). Logs: uvicorn terminal + docker logs -f banviro-ollama",
+      sendError: "Failed to send message",
+      ollamaOffline: "Ollama is not running. Start: ollama serve",
+      placeholder: "e.g. How much did I spend on food this month?",
+      send: "Send",
+      inputHint: "Enter sends · Shift+Enter new line",
+    },
+    categories: {
+      salary: "Salary",
+      freelance: "Freelance",
+      investments: "Investments",
+      other_income: "Other income",
+      rent: "Rent",
+      food: "Food",
+      transport: "Transport",
+      utilities: "Utilities",
+      shopping: "Shopping",
+      health: "Health",
+      entertainment: "Entertainment",
+      other: "Other",
+    },
+    categoryPanel: {
+      title: "Categories",
+      subtitle: "Add custom categories or use the built-in ones",
+      name: "Category name",
+      add: "Add category",
+      adding: "Adding...",
+      custom: "Your categories",
+      default: "Built-in",
+      noCustom: "You don't have custom categories yet.",
+      addError: "Could not add category",
+      deleteError: "Could not delete category",
+      customBadge: "Custom",
+    },
+  },
+} as const;
+
+export type MessageTree = typeof messages.ro;
+
+type PathImpl<T, Key extends keyof T> = Key extends string
+  ? T[Key] extends Record<string, unknown>
+    ? `${Key}.${PathImpl<T[Key], Exclude<keyof T[Key], keyof unknown[]>> & string}` | Key
+    : Key
+  : never;
+
+export type MessageKey = PathImpl<MessageTree, keyof MessageTree>;
+
+export function translate(
+  locale: Locale,
+  key: MessageKey,
+  params?: Record<string, string | number>
+): string {
+  const parts = key.split(".");
+  let value: unknown = messages[locale];
+
+  for (const part of parts) {
+    if (typeof value !== "object" || value === null || !(part in value)) {
+      return key;
+    }
+    value = (value as Record<string, unknown>)[part];
+  }
+
+  if (typeof value !== "string") return key;
+
+  if (!params) return value;
+
+  return value.replace(/\{(\w+)\}/g, (_, paramKey: string) =>
+    paramKey in params ? String(params[paramKey]) : `{${paramKey}}`
+  );
+}
