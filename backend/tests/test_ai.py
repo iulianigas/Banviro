@@ -10,3 +10,4 @@ def test_ai_status() -> None:
     assert "ai_enabled" in data
     assert "ollama_available" in data
     assert data.get("agent") == "langgraph"
+    assert data.get("streaming") is True

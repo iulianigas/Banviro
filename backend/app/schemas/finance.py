@@ -32,6 +32,14 @@ class TransactionCreate(BaseModel):
     transaction_date: date
 
 
+class TransactionUpdate(BaseModel):
+    category_id: int
+    amount: Decimal = Field(gt=0, decimal_places=2)
+    type: TransactionType
+    description: str | None = Field(default=None, max_length=500)
+    transaction_date: date
+
+
 class TransactionRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -21,6 +21,7 @@ from app.schemas.finance import (
     SummaryStats,
     TransactionCreate,
     TransactionRead,
+    TransactionUpdate,
 )
 from app.services.analytics import (
     get_balance_trend,
@@ -162,6 +163,47 @@ def create_transaction(
         transaction_date=payload.transaction_date,
     )
     db.add(transaction)
+    db.commit()
+    db.refresh(transaction)
+
+    background_tasks.add_task(schedule_transaction_index, transaction.id, current_user.id)
+
+    return (
+        db.query(Transaction)
+        .options(joinedload(Transaction.category))
+        .filter(Transaction.id == transaction.id)
+        .one()
+    )
+
+
+@router.put("/transactions/{transaction_id}", response_model=TransactionRead)
+def update_transaction(
+    transaction_id: int,
+    payload: TransactionUpdate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Transaction:
+    transaction = (
+        db.query(Transaction)
+        .filter(Transaction.id == transaction_id, Transaction.user_id == current_user.id)
+        .first()
+    )
+    if transaction is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
+
+    category = _get_category_for_user(db, payload.category_id, current_user.id)
+    if CategoryType(category.type.value) != CategoryType(payload.type.value):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Category type does not match transaction type",
+        )
+
+    transaction.category_id = payload.category_id
+    transaction.amount = payload.amount
+    transaction.type = payload.type
+    transaction.description = payload.description
+    transaction.transaction_date = payload.transaction_date
     db.commit()
     db.refresh(transaction)
 

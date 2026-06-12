@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     # AI layer ($0 stack)
     ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "llama3.2:1b"
+    ollama_model: str = "llama3.2:3b"
     ollama_embed_model: str = "nomic-embed-text"
     ollama_timeout_seconds: int = 120
     ollama_num_predict: int = 200

@@ -1,22 +1,35 @@
+from collections.abc import AsyncIterator
 from typing import TypedDict
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
 from sqlalchemy.orm import Session
 
+from app.ai.graph.router import route_message
 from app.ai.llm.ollama import ollama_client
 from app.ai.logging import ai_logger
-from app.ai.orchestrator import should_use_rag
 from app.ai.rag.retriever import qdrant_retriever
 from app.ai.types import ChatResult
 from app.config import settings
-from app.mcp.tools.finance import execute_finance_tool, finance_tools_for_message
+from app.mcp.tools.finance import execute_finance_tool
 
-SYSTEM_PROMPT_RO = """Ești Banviro AI. Răspunde în română, scurt (max 3-4 propoziții).
-Folosește DOAR cifrele din context. Nu inventa date."""
+SYSTEM_PROMPT_RO = """Ești Banviro AI, un advisor financiar personal.
+Răspunde în română, clar și concis (max 3-4 propoziții).
 
-SYSTEM_PROMPT_EN = """You are Banviro AI. Reply in English, briefly (max 3-4 sentences).
-Use ONLY figures from the context. Do not invent data."""
+Reguli stricte:
+- Folosește DOAR cifrele care apar explicit în secțiunile de context de mai jos.
+- Nu inventa, nu estima și nu recalcula sume care nu sunt în context.
+- Dacă informația lipsește, spune că nu ai datele respective.
+- Răspunde direct la întrebare; evită filler-ul."""
+
+SYSTEM_PROMPT_EN = """You are Banviro AI, a personal finance advisor.
+Reply in English, clearly and concisely (max 3-4 sentences).
+
+Strict rules:
+- Use ONLY numbers explicitly present in the context sections below.
+- Do not invent, estimate, or recalculate figures not in the context.
+- If information is missing, say you do not have that data.
+- Answer the question directly; avoid filler."""
 
 
 class AgentState(TypedDict):
@@ -24,6 +37,8 @@ class AgentState(TypedDict):
     locale: str
     user_id: int
     user_email: str
+    planned_tools: list[str]
+    plan_rag: bool
     summary_text: str
     recent_transactions: str
     budget_text: str
@@ -42,8 +57,14 @@ def _get_db(config: RunnableConfig) -> Session:
     return db
 
 
+async def route_intent(state: AgentState, config: RunnableConfig) -> dict[str, object]:
+    _ = config
+    tools, use_rag = await route_message(state["message"], state["locale"])
+    return {"planned_tools": tools, "plan_rag": use_rag}
+
+
 async def fetch_finance(state: AgentState, config: RunnableConfig) -> dict[str, object]:
-    tool_names = finance_tools_for_message(state["message"])
+    tool_names = state.get("planned_tools", [])
     if not tool_names:
         return {}
 
@@ -78,7 +99,7 @@ async def fetch_finance(state: AgentState, config: RunnableConfig) -> dict[str, 
 
 async def fetch_rag(state: AgentState, config: RunnableConfig) -> dict[str, object]:
     _ = config
-    if not should_use_rag(state["message"]):
+    if not state.get("plan_rag", False):
         return {}
 
     snippets = await qdrant_retriever.search(state["message"], user_id=state["user_id"])
@@ -99,6 +120,29 @@ async def fetch_rag(state: AgentState, config: RunnableConfig) -> dict[str, obje
     }
 
 
+def _build_user_prompt(state: AgentState) -> str:
+    rag_block = "\n".join(f"- {snippet}" for snippet in state.get("rag_snippets", []))
+    question_label = "User question" if state["locale"] == "en" else "Întrebare utilizator"
+    return f"""## Rezumat financiar
+{state.get("summary_text") or "N/A"}
+
+## Tranzacții recente
+{state.get("recent_transactions") or "N/A"}
+
+## Bugete
+{state.get("budget_text") or "N/A"}
+
+## Context semantic (tranzacții relevante)
+{rag_block or "N/A"}
+
+## {question_label}
+{state["message"]}"""
+
+
+def _system_prompt(locale: str) -> str:
+    return SYSTEM_PROMPT_EN if locale == "en" else SYSTEM_PROMPT_RO
+
+
 async def generate_reply(state: AgentState, config: RunnableConfig) -> dict[str, object]:
     _ = config
     if not await ollama_client.is_available():
@@ -106,26 +150,13 @@ async def generate_reply(state: AgentState, config: RunnableConfig) -> dict[str,
         return {
             "reply": (
                 "Ollama nu rulează. Pornește: ollama serve\n"
-                "Apoi: ollama pull llama3.2:1b"
+                f"Apoi: ollama pull {settings.ollama_model}"
             ),
             "model": "unavailable",
         }
 
-    user_prompt = f"""Întrebare utilizator: {state["message"]}
-
-Date financiare:
-{state.get("summary_text") or "N/A"}
-
-Tranzacții recente:
-{state.get("recent_transactions") or "N/A"}
-
-Bugete:
-{state.get("budget_text") or "N/A"}
-
-Context RAG:
-{chr(10).join(state.get("rag_snippets", [])) or "N/A"}
-"""
-    system_prompt = SYSTEM_PROMPT_EN if state["locale"] == "en" else SYSTEM_PROMPT_RO
+    user_prompt = _build_user_prompt(state)
+    system_prompt = _system_prompt(state["locale"])
 
     try:
         reply = await ollama_client.generate(system_prompt, user_prompt)
@@ -136,12 +167,21 @@ Context RAG:
     return {"reply": reply, "model": settings.ollama_model}
 
 
+async def generate_reply_stream(state: AgentState) -> AsyncIterator[str]:
+    user_prompt = _build_user_prompt(state)
+    system_prompt = _system_prompt(state["locale"])
+    async for chunk in ollama_client.generate_stream(system_prompt, user_prompt):
+        yield chunk
+
+
 def build_agent_graph():
     builder = StateGraph(AgentState)
+    builder.add_node("route_intent", route_intent)
     builder.add_node("fetch_finance", fetch_finance)
     builder.add_node("fetch_rag", fetch_rag)
     builder.add_node("generate", generate_reply)
-    builder.add_edge(START, "fetch_finance")
+    builder.add_edge(START, "route_intent")
+    builder.add_edge("route_intent", "fetch_finance")
     builder.add_edge("fetch_finance", "fetch_rag")
     builder.add_edge("fetch_rag", "generate")
     builder.add_edge("generate", END)
@@ -162,6 +202,8 @@ def _initial_state(
         locale=locale,
         user_id=user_id,
         user_email=user_email,
+        planned_tools=[],
+        plan_rag=False,
         summary_text="",
         recent_transactions="",
         budget_text="",
@@ -191,3 +233,42 @@ async def run_agent(
         used_rag=final_state.get("used_rag", False),
         model=final_state.get("model", settings.ollama_model),
     )
+
+
+async def prepare_agent_state(
+    db: Session,
+    user_id: int,
+    user_email: str,
+    message: str,
+    locale: str = "ro",
+) -> AgentState:
+    state = _initial_state(user_id, user_email, message, locale)
+    config: RunnableConfig = {"configurable": {"db": db}}
+    state = {**state, **await route_intent(state, config)}
+    state = {**state, **await fetch_finance(state, config)}
+    state = {**state, **await fetch_rag(state, config)}
+    return state
+
+
+async def run_agent_stream(
+    db: Session,
+    user_id: int,
+    user_email: str,
+    message: str,
+    locale: str = "ro",
+) -> tuple[AgentState, AsyncIterator[str]]:
+    state = await prepare_agent_state(db, user_id, user_email, message, locale)
+
+    if not await ollama_client.is_available():
+        state["reply"] = (
+            "Ollama nu rulează. Pornește: ollama serve\n"
+            f"Apoi: ollama pull {settings.ollama_model}"
+        )
+        state["model"] = "unavailable"
+
+        async def unavailable_stream() -> AsyncIterator[str]:
+            yield state["reply"]
+
+        return state, unavailable_stream()
+
+    return state, generate_reply_stream(state)

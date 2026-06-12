@@ -2,16 +2,49 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.ai.graph.agent import fetch_finance, fetch_rag, generate_reply
+from app.ai.graph.agent import fetch_finance, fetch_rag, generate_reply, route_intent
+from app.ai.graph.router import route_message
 
 
 @pytest.mark.asyncio
-async def test_fetch_finance_skips_unrelated_message() -> None:
+async def test_route_intent_sets_planned_tools() -> None:
+    state = {
+        "message": "Cat am cheltuit?",
+        "locale": "ro",
+        "user_id": 1,
+        "user_email": "test@example.com",
+        "planned_tools": [],
+        "plan_rag": False,
+        "summary_text": "",
+        "recent_transactions": "",
+        "budget_text": "",
+        "rag_snippets": [],
+        "tools_used": [],
+        "used_rag": False,
+        "reply": "",
+        "model": "",
+        "error": None,
+    }
+
+    with patch(
+        "app.ai.graph.agent.route_message",
+        new=AsyncMock(return_value=(["get_summary"], False)),
+    ):
+        result = await route_intent(state, {"configurable": {}})
+
+    assert result["planned_tools"] == ["get_summary"]
+    assert result["plan_rag"] is False
+
+
+@pytest.mark.asyncio
+async def test_fetch_finance_skips_when_no_planned_tools() -> None:
     state = {
         "message": "Salut!",
         "locale": "ro",
         "user_id": 1,
         "user_email": "test@example.com",
+        "planned_tools": [],
+        "plan_rag": False,
         "summary_text": "",
         "recent_transactions": "",
         "budget_text": "",
@@ -35,6 +68,8 @@ async def test_fetch_rag_marks_used_rag() -> None:
         "locale": "ro",
         "user_id": 1,
         "user_email": "test@example.com",
+        "planned_tools": [],
+        "plan_rag": True,
         "summary_text": "",
         "recent_transactions": "",
         "budget_text": "",
@@ -64,6 +99,8 @@ async def test_generate_reply_uses_ollama() -> None:
         "locale": "en",
         "user_id": 1,
         "user_email": "test@example.com",
+        "planned_tools": [],
+        "plan_rag": False,
         "summary_text": "Total balance: 100 RON.",
         "recent_transactions": "",
         "budget_text": "",
@@ -89,3 +126,33 @@ async def test_generate_reply_uses_ollama() -> None:
 
     assert result["reply"] == "Your balance is 100 RON."
     assert result["model"]
+
+
+@pytest.mark.asyncio
+async def test_route_message_parses_llm_json() -> None:
+    with (
+        patch(
+            "app.ai.graph.router.ollama_client.is_available",
+            new=AsyncMock(return_value=True),
+        ),
+        patch(
+            "app.ai.graph.router.ollama_client.generate",
+            new=AsyncMock(return_value='{"tools": ["get_budgets"], "use_rag": true}'),
+        ),
+    ):
+        tools, use_rag = await route_message("How are my budgets?", "en")
+
+    assert tools == ["get_budgets"]
+    assert use_rag is True
+
+
+@pytest.mark.asyncio
+async def test_route_message_falls_back_to_keywords() -> None:
+    with patch(
+        "app.ai.graph.router.ollama_client.is_available",
+        new=AsyncMock(return_value=False),
+    ):
+        tools, use_rag = await route_message("Cât am cheltuit luna asta?", "ro")
+
+    assert "get_summary" in tools
+    assert use_rag is False
