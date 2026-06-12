@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
-import { ChatResponse, getAiStatus, sendAiChat } from "@/lib/api";
+import { ChatResponse, getAiStatus, sendAiChatStream } from "@/lib/api";
 import { useI18n } from "@/lib/i18n/context";
 
 type ChatMessage = {
@@ -47,7 +47,9 @@ export function AiChatPanel({ accessToken, periodLabel }: AiChatPanelProps) {
     getAiStatus()
       .then((status) => {
         setAiReady(status.ai_enabled && status.ollama_available);
-        setModel(status.model);
+        setModel(
+          status.qdrant_available ? status.model : `${status.model} · RAG offline`
+        );
       })
       .catch(() => setAiReady(false));
   }, []);
@@ -76,25 +78,51 @@ export function AiChatPanel({ accessToken, periodLabel }: AiChatPanelProps) {
 
     setError(null);
     setInput("");
+    const assistantId = createId();
     setMessages((prev) => [...prev, { id: createId(), role: "user", content: trimmed }]);
+    setMessages((prev) => [
+      ...prev,
+      { id: assistantId, role: "assistant", content: "", meta: undefined },
+    ]);
     setLoading(true);
 
     try {
-      const response = await sendAiChat(accessToken, trimmed, locale);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: createId(),
-          role: "assistant",
-          content: response.reply,
-          meta: {
-            model: response.model,
-            used_tools: response.used_tools,
-            used_rag: response.used_rag,
-          },
+      const response = await sendAiChatStream(accessToken, trimmed, locale, {
+        onMeta: (meta) => {
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === assistantId ? { ...message, meta } : message
+            )
+          );
         },
-      ]);
+        onToken: (content) => {
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === assistantId
+                ? { ...message, content: message.content + content }
+                : message
+            )
+          );
+        },
+      });
+
+      setMessages((prev) =>
+        prev.map((message) =>
+          message.id === assistantId
+            ? {
+                ...message,
+                content: response.reply,
+                meta: {
+                  model: response.model,
+                  used_tools: response.used_tools,
+                  used_rag: response.used_rag,
+                },
+              }
+            : message
+        )
+      );
     } catch (err) {
+      setMessages((prev) => prev.filter((message) => message.id !== assistantId));
       setError(err instanceof Error ? err.message : t("ai.sendError"));
     } finally {
       setLoading(false);

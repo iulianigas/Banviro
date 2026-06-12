@@ -1,73 +1,188 @@
-# Banviro — Architecture ($0 AI Stack)
+# Banviro Architecture
 
-Banviro follows a layered architecture inspired by the **$0 AI Architecture Stack (2026)**.
-Each layer has a clear role; services run locally via Docker profiles where possible.
+This document describes the system design of Banviro: a personal finance platform with an integrated AI advisor. The application follows a layered architecture with a clear separation between the web client, API, data stores, and AI subsystem.
 
-## Layer map
+## Design principles
 
-| # | Layer | Role in Banviro | Technology |
-|---|--------|-----------------|------------|
-| 1 | **Frontend** | Dashboard, auth, charts, chat UI (next) | Next.js 15, Vercel (prod) |
-| 2 | **Agent Orchestrator** | Routes user questions: SQL vs RAG vs tools | FastAPI + custom orchestrator → LangGraph (phase 2) |
-| 3 | **RAG Pipeline** | Semantic search on transaction descriptions | Qdrant (local), embeddings via Ollama |
-| 4 | **LLM Layer** | Local inference, $0 | Ollama (Llama 3.2, Mistral, Gemma) |
-| 5 | **Tool Use (MCP)** | GitHub, finance DB, exports | MCP-style tool registry in Python |
-| 6 | **Code Agent** | Dev automation (optional, dev-only) | Claude Code / Aider (outside runtime) |
-| 7 | **Data Layer** | Users, transactions, budgets | PostgreSQL (prod: Supabase free tier) |
-| 8 | **Deployment** | CI/CD + containers | Docker, GitHub Actions, Cloudflare (later) |
-| — | **Observability** | Traces for AI + API | Phoenix (self-hosted, profile `ai`) |
+- **PostgreSQL as the source of truth** for all financial records
+- **Self-hosted AI components** (Ollama, Qdrant) for local development and cost control
+- **User-scoped data access** at every layer — API, tools, and vector search
+- **Explicit orchestration** via LangGraph rather than ad-hoc prompt chains
+- **Streaming-first chat** with a synchronous fallback for automation and tests
 
-## Request flow (AI chat)
+## System layers
+
+| Layer | Responsibility | Implementation | Status |
+| --- | --- | --- | --- |
+| Frontend | Authentication UI, dashboards, budgets, AI chat | Next.js 15, React 19, TypeScript | Complete |
+| Agent orchestrator | Route intent, invoke tools, retrieve context, generate replies | LangGraph, FastAPI | Complete |
+| RAG pipeline | Semantic search over transaction history | Qdrant, Ollama embeddings | Complete |
+| LLM | Chat completion and intent routing | Ollama (`llama3.2:3b`, `nomic-embed-text`) | Complete |
+| Tool layer | Structured access to finance data | Python MCP-style tools, LLM routing | Partial |
+| Data | Persistent application state | PostgreSQL 16 | Complete |
+| Deployment | Containers, CI, production hosting | Docker Compose, GitHub Actions | Partial |
+| Observability | Tracing and monitoring for AI and API | Phoenix | Partial |
+
+The tool layer is **partial** because finance tools are implemented as in-process Python functions rather than a standalone MCP server. Observability is **partial** because the Phoenix container is provisioned but OpenTelemetry instrumentation is not yet wired into the agent.
+
+## High-level diagram
 
 ```
-User (Next.js)
-    → POST /api/v1/ai/chat
-    → Orchestrator
-        ├─ needs structured data? → Finance MCP tools → PostgreSQL
-        ├─ needs semantic context? → RAG → Qdrant
-        └─ generate answer → Ollama LLM
-    → Response + optional sources
-    → Phoenix traces (when enabled)
+┌─────────────┐     HTTPS/JWT      ┌─────────────┐
+│   Next.js   │ ◄────────────────► │   FastAPI   │
+│   Frontend  │                    │     API     │
+└─────────────┘                    └──────┬──────┘
+                                          │
+                    ┌─────────────────────┼─────────────────────┐
+                    │                     │                     │
+                    ▼                     ▼                     ▼
+             ┌────────────┐        ┌────────────┐        ┌────────────┐
+             │ PostgreSQL │        │  LangGraph │        │   Qdrant   │
+             │  (source   │        │   Agent    │        │  (vectors) │
+             │  of truth) │        └─────┬──────┘        └────────────┘
+             └────────────┘              │
+                                         ▼
+                                  ┌────────────┐
+                                  │   Ollama   │
+                                  │  LLM +     │
+                                  │  embeddings│
+                                  └────────────┘
 ```
 
-## Docker profiles
+## AI chat request flow
 
-**Core (always):**
+The primary chat endpoint is `POST /api/v1/ai/chat/stream`. It returns Server-Sent Events with the following sequence: `meta` → `token` (repeated) → `done`.
+
+```
+Client (Next.js)
+  │
+  ▼
+POST /api/v1/ai/chat/stream
+  │
+  ▼
+LangGraph agent
+  │
+  ├─ route_intent      LLM selects finance tools and whether RAG is needed
+  │
+  ├─ fetch_finance     Execute MCP-style tools against PostgreSQL
+  │                      • get_summary
+  │                      • list_transactions
+  │                      • get_budgets
+  │
+  ├─ fetch_rag         Query Qdrant when RAG is planned
+  │
+  └─ generate          Stream completion from Ollama
+  │
+  ▼
+SSE response to client
+```
+
+A synchronous endpoint, `POST /api/v1/ai/chat`, is retained for scripts, smoke tests, and integrations that do not require streaming.
+
+### Intent routing
+
+The `route_intent` node sends the user message to Ollama with a structured JSON schema. The model returns which finance tools to invoke and whether semantic retrieval is required. If Ollama is unavailable or returns invalid JSON, the agent falls back to keyword-based heuristics.
+
+### Prompt constraints
+
+The generation step receives structured context sections (summary, recent transactions, budgets, RAG snippets) and is instructed to:
+
+- Use only figures explicitly present in the context
+- Avoid inventing or recalculating amounts
+- State clearly when requested data is missing
+
+## Transaction indexing
+
+Transaction records are indexed into Qdrant to support semantic search during RAG retrieval. Indexing runs asynchronously and does not block API responses.
+
+| Trigger | Action |
+| --- | --- |
+| Transaction created | Upsert vector point |
+| Transaction updated | Upsert vector point |
+| Transaction deleted | Delete vector point |
+| Manual reindex | `POST /api/v1/ai/reindex` rebuilds all points for the authenticated user |
+
+Each indexed document includes the transaction date, type, category, amount, and description. Embeddings are generated via Ollama and stored with a `user_id` payload for tenant isolation.
+
+## Data stores
+
+| Store | Role |
+| --- | --- |
+| PostgreSQL | Authoritative storage for users, categories, transactions, and budgets |
+| Qdrant | Vector index for transaction search and RAG context retrieval |
+| Ollama | Model runtime for chat completion, intent routing, and embeddings |
+
+Planned additions:
+
+| Store | Role |
+| --- | --- |
+| Supabase | Managed PostgreSQL for production deployments |
+| DuckDB | Local analytics and export workloads |
+
+## Infrastructure
+
+### Core services
+
 ```bash
 docker compose up -d
-# db + api
 ```
 
-**AI stack ($0 local):**
+Starts PostgreSQL and other core dependencies defined in `docker-compose.yml`.
+
+### AI services
+
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.ai.yml up -d
-# + ollama, qdrant, phoenix
-ollama pull llama3.2
+ollama pull llama3.2:3b
+ollama pull nomic-embed-text
 ```
 
-## Data strategy
+Provisions Ollama, Qdrant, and Phoenix. On macOS, running Ollama natively (`brew install ollama`) is recommended while keeping Qdrant in Docker.
 
-| Store | Use |
-|-------|-----|
-| **PostgreSQL** | Source of truth — users, transactions, budgets |
-| **Qdrant** | Vector index for transaction notes / chat context |
-| **DuckDB** | (Phase 3) Local analytics / exports |
-| **Supabase** | (Prod) Managed Postgres + auth optional migration |
+| Service | Port | Purpose |
+| --- | --- | --- |
+| Ollama | 11434 | LLM inference and embeddings |
+| Qdrant | 6333 | Vector storage and search |
+| Phoenix | 6006 | AI observability UI |
+| FastAPI | 8000 | REST API |
 
-## Security
+## Security model
 
-- JWT auth on all `/finance/*` and `/ai/*` routes
-- LLM never receives raw passwords or tokens
-- MCP tools scoped per `user_id` (row-level isolation)
-- Secrets via `.env` / GitHub Secrets — never in repo
+- All `/finance/*` and `/ai/*` routes require a valid JWT access token.
+- Finance tools query the database scoped to the authenticated `user_id`.
+- Qdrant searches include a mandatory filter on `user_id` in the point payload.
+- Credentials, tokens, and secrets are never passed to the LLM.
+- Secrets are loaded from environment variables or CI secret stores, not committed to the repository.
+
+## Verification
+
+Run the backend unit tests:
+
+```bash
+cd backend && pytest
+```
+
+Run the AI smoke test (requires API, Ollama, and Qdrant):
+
+```bash
+chmod +x scripts/e2e-ai.sh
+./scripts/e2e-ai.sh
+```
 
 ## Roadmap
 
-- [x] Core API + frontend + CI
-- [x] Finance CRUD, charts, budgets, filters
-- [x] AI layer scaffold (orchestrator, Ollama, RAG stub, MCP tools)
-- [ ] LangGraph agent graph
-- [ ] Chat UI in dashboard
-- [ ] Transaction indexing into Qdrant
-- [ ] Phoenix OpenTelemetry instrumentation
-- [ ] Deploy: Vercel (web) + Fly.io/Railway (API) + Supabase (DB)
+**Completed**
+
+- Core API, frontend, and CI pipeline
+- Finance CRUD, budgets, analytics, and month filtering
+- LangGraph agent with tool invocation and RAG retrieval
+- Streaming chat UI in the dashboard
+- Transaction indexing on create, update, and delete
+- LLM-based intent routing with keyword fallback
+
+**Planned**
+
+- Phoenix OpenTelemetry instrumentation across agent nodes
+- Standalone MCP protocol server (FastMCP)
+- Production deployment (Vercel, Fly.io or Railway, Supabase)
+- Subscription billing and multi-factor authentication

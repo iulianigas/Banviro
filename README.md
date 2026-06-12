@@ -1,43 +1,58 @@
 # Banviro
 
-Personal finance tracker — charts, budgets, month filters, and secure multi-user access.
+Personal finance platform with multi-user accounts, budgeting, analytics, and an integrated AI advisor.
 
-## Stack
+## Overview
 
-| Layer | Technology |
-|---|---|
+Banviro helps users track income and expenses, monitor budgets by category, and explore trends through interactive dashboards. The AI layer answers finance questions using live account data and semantic search over transaction history.
+
+**Core capabilities**
+
+- JWT-authenticated accounts with refresh tokens
+- Transaction and category management
+- Monthly budgets with progress tracking
+- Analytics: balance, spending breakdown, monthly and balance trends
+- AI chat with LangGraph orchestration, finance tools, Qdrant RAG, and SSE streaming
+
+## Technology
+
+| Layer | Stack |
+| --- | --- |
 | Backend | Python 3.12, FastAPI, SQLAlchemy, Alembic |
 | Database | PostgreSQL 16 |
 | Frontend | Next.js 15, React 19, TypeScript, Tailwind CSS |
-| Auth | JWT (access + refresh tokens), bcrypt |
+| Authentication | JWT, bcrypt |
+| AI orchestration | LangGraph |
+| LLM & embeddings | Ollama |
+| Vector store | Qdrant |
+| Observability | Phoenix (instrumentation in progress) |
 | CI | GitHub Actions |
-| AI Orchestrator | FastAPI orchestrator → LangGraph (phase 2) |
-| LLM | Ollama (local, $0) |
-| RAG | Qdrant (local) |
-| Observability | Phoenix (profile `ai`) |
-| Deploy | Docker, Vercel/Cloudflare (planned) |
+| Containers | Docker Compose |
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full $0 AI stack mapping.
+For a detailed architecture breakdown, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-## Project structure
+## Repository layout
 
 ```
 banviro/
-├── backend/
-│   ├── app/
-│   │   ├── ai/           # Orchestrator, LLM, RAG
-│   │   ├── mcp/          # MCP-style tools
-│   │   └── api/          # REST routes
-├── frontend/             # Next.js web app
-├── docs/ARCHITECTURE.md
-├── docker-compose.yml    # core (db + api)
-├── docker-compose.ai.yml # optional AI services
-└── .github/workflows/ci.yml
+├── backend/              # FastAPI application
+├── frontend/             # Next.js web application
+├── docs/                 # Architecture and design notes
+├── scripts/              # Operational and test scripts
+├── docker-compose.yml    # Core services
+└── docker-compose.ai.yml # AI services (Ollama, Qdrant, Phoenix)
 ```
 
-## Quick start
+## Prerequisites
 
-### 1. Start PostgreSQL
+- Python 3.12+
+- Node.js 20+
+- Docker and Docker Compose
+- [Ollama](https://ollama.com/) (native install or via Docker)
+
+## Getting started
+
+### 1. Database
 
 ```bash
 docker compose up -d db
@@ -55,7 +70,7 @@ alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-API docs: http://localhost:8000/docs
+API documentation: http://localhost:8000/docs
 
 ### 3. Frontend
 
@@ -66,93 +81,116 @@ npm install
 npm run dev
 ```
 
-App: http://localhost:3000
+Application: http://localhost:3000
 
-### 4. AI stack (optional, $0 local)
+### 4. AI services
 
-**Varianta A — Ollama nativ pe Mac (recomandat, fără Docker profiles):**
+Pull the required models:
+
+```bash
+ollama pull llama3.2:3b
+ollama pull nomic-embed-text
+```
+
+**Native Ollama (recommended on macOS)**
 
 ```bash
 brew install ollama
-ollama serve          # Terminal separat, lasă-l pornit
-ollama pull llama3.2  # Terminal nou
+ollama serve
 ```
 
-**Varianta B — AI services în Docker (2 fișiere compose):**
+**Docker**
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.ai.yml up -d
-docker exec -it banviro-ollama ollama pull llama3.2
+docker exec -it banviro-ollama ollama pull llama3.2:3b
+docker exec -it banviro-ollama ollama pull nomic-embed-text
 ```
 
-Pe Docker vechi, înlocuiește `docker compose` cu `docker-compose`.
+| Service | Endpoint |
+| --- | --- |
+| Ollama | http://localhost:11434 |
+| Qdrant | http://localhost:6333 |
+| Phoenix | http://localhost:6006 |
+| AI status | http://localhost:8000/api/v1/ai/status |
 
-- Ollama: http://localhost:11434
-- Qdrant: http://localhost:6333
-- Phoenix: http://localhost:6006
-- AI status: http://localhost:8000/api/v1/ai/status
-- Chat: `POST /api/v1/ai/chat` `{ "message": "..." }` (Bearer token)
+Set `AI_ENABLED=true` in `backend/.env` to enable AI features.
 
-## API endpoints (v1)
+## Testing
 
-| Method | Path | Description |
-|---|---|---|
-| GET | `/api/v1/health` | Health check |
-| POST | `/api/v1/auth/register` | Create account |
-| POST | `/api/v1/auth/login` | Login (returns JWT tokens) |
-| POST | `/api/v1/auth/refresh` | Refresh access token |
-| GET | `/api/v1/auth/me` | Current user (requires Bearer token) |
-| GET | `/api/v1/finance/categories` | List categories |
-| GET/POST | `/api/v1/finance/transactions` | List / create transactions |
-| DELETE | `/api/v1/finance/transactions/{id}` | Delete transaction |
-| GET | `/api/v1/finance/analytics/summary` | Balance & monthly stats |
-| GET | `/api/v1/finance/analytics/spending-by-category` | Pie chart data |
-| GET | `/api/v1/finance/analytics/monthly-trend` | Bar chart data (6 months) |
-| GET | `/api/v1/finance/analytics/balance-trend` | Balance evolution (6 months) |
-| GET/PUT/DELETE | `/api/v1/finance/budgets` | Monthly budgets per category |
-| GET | `/api/v1/ai/status` | AI layer health |
-| POST | `/api/v1/ai/chat` | Finance AI advisor |
-
-## GitHub setup
-
-1. Create a new repository on GitHub (e.g. `banviro`).
-2. Push this project:
+Run the backend test suite:
 
 ```bash
-git add .
-git commit -m "Initial Banviro project"
-git branch -M main
-git remote add origin git@github.com:YOUR_USERNAME/banviro.git
-git push -u origin main
+cd backend
+pytest
 ```
 
-3. Every push/PR to `main` or `develop` triggers CI (tests + build).
-4. Deploy step is a placeholder — configure Railway/Fly.io/Vercel in the next phase.
+Run the AI smoke test (requires API, Ollama, and Qdrant):
 
-## Next phases
+```bash
+chmod +x scripts/e2e-ai.sh
+./scripts/e2e-ai.sh
+```
 
-- [x] Transactions & categories (CRUD)
-- [x] Charts & dashboard metrics
-- [x] Month filter + balance trend + budgets
-- [x] AI layer scaffold (Ollama + Qdrant + orchestrator)
-- [ ] Chat UI in dashboard
-- [ ] LangGraph agent + Qdrant indexing
-- [ ] Stripe subscriptions
-- [ ] Production deploy pipeline
-- [ ] MFA & enhanced security hardening
+CI runs on every push and pull request to `main` and `develop`.
 
-## Environment variables
+## API reference
 
-**Backend** (`backend/.env`):
+Base path: `/api/v1`
 
-- `DATABASE_URL` — PostgreSQL connection string
-- `SECRET_KEY` — JWT signing key (use a long random value in production)
-- `CORS_ORIGINS` — Allowed frontend origins
+| Method | Path | Description |
+| --- | --- | --- |
+| GET | `/health` | Service health check |
+| POST | `/auth/register` | Register a new user |
+| POST | `/auth/login` | Authenticate and receive tokens |
+| POST | `/auth/refresh` | Refresh access token |
+| GET | `/auth/me` | Current user profile |
+| GET | `/finance/categories` | List categories |
+| GET, POST | `/finance/transactions` | List or create transactions |
+| PUT | `/finance/transactions/{id}` | Update a transaction |
+| DELETE | `/finance/transactions/{id}` | Delete a transaction |
+| GET | `/finance/analytics/summary` | Balance and monthly summary |
+| GET | `/finance/analytics/spending-by-category` | Spending by category |
+| GET | `/finance/analytics/monthly-trend` | Monthly income and expenses |
+| GET | `/finance/analytics/balance-trend` | Balance over time |
+| GET, PUT, DELETE | `/finance/budgets` | Manage monthly budgets |
+| GET | `/ai/status` | AI subsystem health |
+| POST | `/ai/chat` | AI chat (synchronous) |
+| POST | `/ai/chat/stream` | AI chat (Server-Sent Events) |
+| POST | `/ai/reindex` | Rebuild Qdrant index for the current user |
 
-**Frontend** (`frontend/.env.local`):
+All finance and AI routes require a valid Bearer token.
 
-- `NEXT_PUBLIC_API_URL` — Backend API URL
+## Configuration
+
+**Backend** — `backend/.env`
+
+| Variable | Description |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `SECRET_KEY` | JWT signing secret |
+| `CORS_ORIGINS` | Allowed frontend origins |
+| `OLLAMA_MODEL` | Chat model (default: `llama3.2:3b`) |
+| `OLLAMA_EMBED_MODEL` | Embedding model (default: `nomic-embed-text`) |
+| `QDRANT_URL` | Qdrant base URL |
+| `AI_ENABLED` | Enable or disable AI features |
+
+**Frontend** — `frontend/.env.local`
+
+| Variable | Description |
+| --- | --- |
+| `NEXT_PUBLIC_API_URL` | Backend API URL |
+
+## Roadmap
+
+- [x] Finance CRUD, budgets, and analytics
+- [x] LangGraph agent with finance tools and Qdrant RAG
+- [x] Streaming AI chat in the dashboard
+- [ ] Phoenix OpenTelemetry instrumentation
+- [ ] MCP protocol server
+- [ ] Production deployment pipeline
+- [ ] Subscriptions and enhanced security (MFA)
 
 ## License
 
-Private — all rights reserved.
+Proprietary. All rights reserved.

@@ -312,6 +312,8 @@ export type AiStatus = {
   ollama_available: boolean;
   qdrant_available: boolean;
   model: string;
+  embed_model?: string;
+  streaming?: boolean;
 };
 
 export type ChatResponse = {
@@ -319,6 +321,13 @@ export type ChatResponse = {
   model: string;
   used_tools: string[];
   used_rag: boolean;
+};
+
+export type ChatStreamHandlers = {
+  onMeta?: (meta: Pick<ChatResponse, "model" | "used_tools" | "used_rag">) => void;
+  onToken?: (content: string) => void;
+  onDone?: (response: ChatResponse) => void;
+  onError?: (error: Error) => void;
 };
 
 export async function getAiStatus(): Promise<AiStatus> {
@@ -338,4 +347,105 @@ export async function sendAiChat(
   });
 
   return parseResponse<ChatResponse>(response);
+}
+
+function parseSseBlock(block: string): { event: string; data: string } | null {
+  const lines = block.split("\n");
+  let event = "message";
+  let data = "";
+
+  for (const line of lines) {
+    if (line.startsWith("event:")) {
+      event = line.slice(6).trim();
+    } else if (line.startsWith("data:")) {
+      data += line.slice(5).trim();
+    }
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return { event, data };
+}
+
+export async function sendAiChatStream(
+  accessToken: string,
+  message: string,
+  locale: "ro" | "en" = "ro",
+  handlers: ChatStreamHandlers = {}
+): Promise<ChatResponse> {
+  const response = await fetch(`${API_URL}/api/v1/ai/chat/stream`, {
+    method: "POST",
+    headers: authHeaders(accessToken),
+    body: JSON.stringify({ message, locale }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    const detail =
+      typeof data === "object" && data !== null && "detail" in data
+        ? String((data as { detail: unknown }).detail)
+        : "Request failed";
+    throw new ApiError(detail, response.status);
+  }
+
+  if (!response.body) {
+    throw new ApiError("Streaming response unavailable", response.status);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let finalResponse: ChatResponse | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+
+    buffer += decoder.decode(value, { stream: true });
+    const blocks = buffer.split("\n\n");
+    buffer = blocks.pop() ?? "";
+
+    for (const block of blocks) {
+      const parsed = parseSseBlock(block);
+      if (!parsed) {
+        continue;
+      }
+
+      const payload = JSON.parse(parsed.data) as Record<string, unknown>;
+
+      if (parsed.event === "meta") {
+        handlers.onMeta?.({
+          model: String(payload.model ?? ""),
+          used_tools: Array.isArray(payload.used_tools)
+            ? payload.used_tools.map(String)
+            : [],
+          used_rag: Boolean(payload.used_rag),
+        });
+      } else if (parsed.event === "token") {
+        handlers.onToken?.(String(payload.content ?? ""));
+      } else if (parsed.event === "error") {
+        throw new ApiError(String(payload.message ?? "Stream failed"), 500);
+      } else if (parsed.event === "done") {
+        finalResponse = {
+          reply: String(payload.reply ?? ""),
+          model: String(payload.model ?? ""),
+          used_tools: Array.isArray(payload.used_tools)
+            ? payload.used_tools.map(String)
+            : [],
+          used_rag: Boolean(payload.used_rag),
+        };
+        handlers.onDone?.(finalResponse);
+      }
+    }
+  }
+
+  if (!finalResponse) {
+    throw new ApiError("Stream ended without a final response", 500);
+  }
+
+  return finalResponse;
 }
