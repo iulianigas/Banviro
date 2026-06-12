@@ -2,10 +2,20 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
-from app.i18n.categories import display_category_name
-from app.services.analytics import get_budget_progress, get_summary_stats, list_user_transactions
+from app.i18n.categories import SYSTEM_CATEGORY_LABELS, display_category_name
+from app.services.analytics import (
+    get_budget_progress,
+    get_spending_by_category,
+    get_summary_stats,
+    list_user_transactions,
+)
 
-FINANCE_TOOL_NAMES = ("get_summary", "list_transactions", "get_budgets")
+FINANCE_TOOL_NAMES = (
+    "get_summary",
+    "list_transactions",
+    "get_budgets",
+    "get_spending_by_category",
+)
 
 
 def get_finance_tool_definitions() -> list[dict[str, str]]:
@@ -21,6 +31,10 @@ def get_finance_tool_definitions() -> list[dict[str, str]]:
         {
             "name": "get_budgets",
             "description": "Returnează progresul bugetelor lunare pe categorii.",
+        },
+        {
+            "name": "get_spending_by_category",
+            "description": "Returnează cheltuielile lunii curente grupate pe categorie.",
         },
     ]
 
@@ -42,8 +56,15 @@ def run_get_summary(db: Session, user_id: int, locale: str) -> str:
     )
 
 
-def run_list_transactions(db: Session, user_id: int, locale: str, limit: int = 5) -> str:
-    transactions = list_user_transactions(db, user_id, limit=limit)
+def run_list_transactions(db: Session, user_id: int, locale: str, limit: int = 20) -> str:
+    today = date.today()
+    transactions = list_user_transactions(
+        db,
+        user_id,
+        limit=limit,
+        month=today.month,
+        year=today.year,
+    )
     if not transactions:
         return "No recent transactions." if locale == "en" else "Nicio tranzacție recentă."
 
@@ -87,6 +108,39 @@ def run_get_budgets(db: Session, user_id: int, locale: str) -> str:
     return "\n".join(lines)
 
 
+def run_get_spending_by_category(db: Session, user_id: int, locale: str) -> str:
+    today = date.today()
+    breakdown = get_spending_by_category(db, user_id, today.month, today.year)
+    if not breakdown:
+        return (
+            "No category spending for the current month."
+            if locale == "en"
+            else "Nicio cheltuială pe categorii luna curentă."
+        )
+
+    lines = []
+    for item in breakdown:
+        category_label = display_category_name(
+            item.category_name,
+            item.category_slug,
+            locale,
+        )
+        if locale == "en":
+            lines.append(f"- {category_label}: {item.amount} RON")
+        else:
+            lines.append(f"- {category_label}: {item.amount} RON")
+    return "\n".join(lines)
+
+
+def _category_keywords() -> tuple[str, ...]:
+    keywords: list[str] = []
+    for slug, labels in SYSTEM_CATEGORY_LABELS.items():
+        keywords.append(slug)
+        keywords.append(labels["ro"].lower())
+        keywords.append(labels["en"].lower())
+    return tuple(keywords)
+
+
 def finance_tools_for_message(message: str) -> list[str]:
     lowered = message.lower()
     tools: list[str] = []
@@ -110,17 +164,26 @@ def finance_tools_for_message(message: str) -> list[str]:
         "transaction",
         "suma",
         "amount",
+        "cat ",
+        "cât",
+        "how much",
     )
     budget_keywords = ("buget", "budget")
+    category_keywords = _category_keywords()
 
     if any(word in lowered for word in finance_keywords):
-        tools.extend(["get_summary", "list_transactions"])
+        tools.extend(["get_summary", "list_transactions", "get_spending_by_category"])
+
+    if any(word in lowered for word in category_keywords):
+        for tool_name in ("get_spending_by_category", "list_transactions"):
+            if tool_name not in tools:
+                tools.append(tool_name)
 
     if any(word in lowered for word in budget_keywords):
         if "get_budgets" not in tools:
             tools.append("get_budgets")
 
-    return tools
+    return list(dict.fromkeys(tools))
 
 
 def execute_finance_tool(
@@ -133,6 +196,7 @@ def execute_finance_tool(
         "get_summary": run_get_summary,
         "list_transactions": run_list_transactions,
         "get_budgets": run_get_budgets,
+        "get_spending_by_category": run_get_spending_by_category,
     }
     runner = runners.get(tool_name)
     if runner is None:

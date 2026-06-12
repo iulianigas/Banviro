@@ -147,7 +147,26 @@ async def test_route_message_parses_llm_json() -> None:
 
 
 @pytest.mark.asyncio
-async def test_route_message_falls_back_to_keywords() -> None:
+async def test_route_message_merges_keywords_when_llm_returns_empty() -> None:
+    with (
+        patch(
+            "app.ai.graph.router.ollama_client.is_available",
+            new=AsyncMock(return_value=True),
+        ),
+        patch(
+            "app.ai.graph.router.ollama_client.generate",
+            new=AsyncMock(return_value='{"tools": [], "use_rag": false}'),
+        ),
+    ):
+        tools, use_rag = await route_message("Cât am cheltuit pe transport?", "ro")
+
+    assert "get_spending_by_category" in tools
+    assert "list_transactions" in tools
+    assert use_rag is False
+
+
+@pytest.mark.asyncio
+async def test_route_message_falls_back_to_keywords_when_offline() -> None:
     with patch(
         "app.ai.graph.router.ollama_client.is_available",
         new=AsyncMock(return_value=False),

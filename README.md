@@ -25,7 +25,7 @@ Banviro helps users track income and expenses, monitor budgets by category, and 
 | AI orchestration | LangGraph |
 | LLM & embeddings | Ollama |
 | Vector store | Qdrant |
-| Observability | Phoenix (instrumentation in progress) |
+| Observability | Phoenix OpenTelemetry (LangGraph, Ollama, Qdrant spans) |
 | CI | GitHub Actions |
 | Containers | Docker Compose |
 
@@ -116,6 +116,8 @@ docker exec -it banviro-ollama ollama pull nomic-embed-text
 
 Set `AI_ENABLED=true` in `backend/.env` to enable AI features.
 
+Ensure Phoenix is running to collect traces (`docker compose -f docker-compose.yml -f docker-compose.ai.yml up -d phoenix`). Traces appear at http://localhost:6006 under the **banviro** project → **Tracing** tab. Send a chat message first, then refresh the trace list.
+
 ## Testing
 
 Run the backend test suite:
@@ -174,6 +176,10 @@ All finance and AI routes require a valid Bearer token.
 | `OLLAMA_EMBED_MODEL` | Embedding model (default: `nomic-embed-text`) |
 | `QDRANT_URL` | Qdrant base URL |
 | `AI_ENABLED` | Enable or disable AI features |
+| `PHOENIX_ENABLED` | Enable OpenTelemetry export to Phoenix |
+| `PHOENIX_PROJECT_NAME` | Phoenix project name (default: `banviro`) |
+| `PHOENIX_COLLECTOR_ENDPOINT` | OTLP collector URL (default: `http://localhost:4317`) |
+| `PHOENIX_COLLECTOR_PROTOCOL` | OTLP protocol: `grpc` or `http/protobuf` |
 
 **Frontend** — `frontend/.env.local`
 
@@ -186,7 +192,7 @@ All finance and AI routes require a valid Bearer token.
 - [x] Finance CRUD, budgets, and analytics
 - [x] LangGraph agent with finance tools and Qdrant RAG
 - [x] Streaming AI chat in the dashboard
-- [ ] Phoenix OpenTelemetry instrumentation
+- [x] Phoenix OpenTelemetry instrumentation
 - [ ] MCP protocol server
 - [ ] Production deployment pipeline
 - [ ] Subscriptions and enhanced security (MFA)

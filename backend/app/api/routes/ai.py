@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.ai.logging import ai_logger
 from app.ai.service import run_chat, run_chat_stream
+from app.ai.tracing import chat_trace_context, is_tracing_enabled, span_kind, trace_span
 from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_user
@@ -85,54 +86,62 @@ async def chat_stream(
 
         return StreamingResponse(disabled_stream(), media_type="text/event-stream")
 
-    meta, stream = await run_chat_stream(
-        db,
-        current_user.id,
-        current_user.email,
-        payload.message,
-        payload.locale,
-    )
-    if meta is None or stream is None:
-        raise RuntimeError("Streaming unavailable")
+    user_id = current_user.id
+    user_email = current_user.email
+    locale = payload.locale
+    message = payload.message
 
     async def event_stream() -> AsyncIterator[str]:
-        yield _sse(
-            "meta",
-            {
-                "model": meta.model,
-                "used_tools": meta.used_tools,
-                "used_rag": meta.used_rag,
-            },
-        )
+        with chat_trace_context(user_id, locale, message):
+            with trace_span("ai.chat", **span_kind("agent"), mode="stream"):
+                meta, stream = await run_chat_stream(
+                    db,
+                    user_id,
+                    user_email,
+                    message,
+                    locale,
+                )
+                if meta is None or stream is None:
+                    yield _sse("error", {"message": "Streaming unavailable"})
+                    return
 
-        chunks: list[str] = []
-        try:
-            async for chunk in stream:
-                chunks.append(chunk)
-                yield _sse("token", {"content": chunk})
-        except (TimeoutError, RuntimeError) as exc:
-            ai_logger.error("chat stream failed user_id=%s: %s", current_user.id, exc)
-            yield _sse("error", {"message": str(exc)})
-            return
+                yield _sse(
+                    "meta",
+                    {
+                        "model": meta.model,
+                        "used_tools": meta.used_tools,
+                        "used_rag": meta.used_rag,
+                    },
+                )
 
-        reply = "".join(chunks)
-        ai_logger.info(
-            "chat stream done user_id=%s model=%s tools=%s rag=%s reply_chars=%d",
-            current_user.id,
-            meta.model,
-            meta.used_tools,
-            meta.used_rag,
-            len(reply),
-        )
-        yield _sse(
-            "done",
-            {
-                "reply": reply,
-                "model": meta.model,
-                "used_tools": meta.used_tools,
-                "used_rag": meta.used_rag,
-            },
-        )
+                chunks: list[str] = []
+                try:
+                    async for chunk in stream:
+                        chunks.append(chunk)
+                        yield _sse("token", {"content": chunk})
+                except (TimeoutError, RuntimeError) as exc:
+                    ai_logger.error("chat stream failed user_id=%s: %s", user_id, exc)
+                    yield _sse("error", {"message": str(exc)})
+                    return
+
+                reply = "".join(chunks)
+                ai_logger.info(
+                    "chat stream done user_id=%s model=%s tools=%s rag=%s reply_chars=%d",
+                    user_id,
+                    meta.model,
+                    meta.used_tools,
+                    meta.used_rag,
+                    len(reply),
+                )
+                yield _sse(
+                    "done",
+                    {
+                        "reply": reply,
+                        "model": meta.model,
+                        "used_tools": meta.used_tools,
+                        "used_rag": meta.used_rag,
+                    },
+                )
 
     return StreamingResponse(
         event_stream(),
@@ -158,6 +167,12 @@ async def ai_status() -> dict[str, object]:
         "embed_model": settings.ollama_embed_model,
         "agent": "langgraph",
         "streaming": True,
+        "phoenix_enabled": settings.phoenix_enabled,
+        "phoenix_tracing_active": is_tracing_enabled(),
+        "phoenix_ui": settings.phoenix_endpoint,
+        "phoenix_collector": settings.phoenix_collector_endpoint,
+        "phoenix_collector_protocol": settings.phoenix_collector_protocol,
+        "phoenix_project": settings.phoenix_project_name,
     }
 
 

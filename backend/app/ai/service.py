@@ -3,6 +3,7 @@ from collections.abc import AsyncIterator
 from sqlalchemy.orm import Session
 
 from app.ai.graph.agent import run_agent, run_agent_stream
+from app.ai.tracing import chat_trace_context, span_kind, trace_span
 from app.ai.types import ChatResult
 from app.config import settings
 
@@ -20,7 +21,9 @@ async def run_chat(
             model="disabled",
         )
 
-    return await run_agent(db, user_id, user_email, message, locale)
+    with chat_trace_context(user_id, locale, message):
+        with trace_span("ai.chat", **span_kind("agent"), mode="sync"):
+            return await run_agent(db, user_id, user_email, message, locale)
 
 
 async def run_chat_stream(

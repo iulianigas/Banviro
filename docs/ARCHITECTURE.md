@@ -21,9 +21,9 @@ This document describes the system design of Banviro: a personal finance platfor
 | Tool layer | Structured access to finance data | Python MCP-style tools, LLM routing | Partial |
 | Data | Persistent application state | PostgreSQL 16 | Complete |
 | Deployment | Containers, CI, production hosting | Docker Compose, GitHub Actions | Partial |
-| Observability | Tracing and monitoring for AI and API | Phoenix | Partial |
+| Observability | Tracing and monitoring for AI and API | Phoenix OpenTelemetry | Complete |
 
-The tool layer is **partial** because finance tools are implemented as in-process Python functions rather than a standalone MCP server. Observability is **partial** because the Phoenix container is provisioned but OpenTelemetry instrumentation is not yet wired into the agent.
+The tool layer is **partial** because finance tools are implemented as in-process Python functions rather than a standalone MCP server.
 
 ## High-level diagram
 
@@ -78,6 +78,32 @@ SSE response to client
 ```
 
 A synchronous endpoint, `POST /api/v1/ai/chat`, is retained for scripts, smoke tests, and integrations that do not require streaming.
+
+## Observability
+
+Phoenix collects OpenTelemetry traces exported from the FastAPI application on startup. Instrumentation covers:
+
+| Component | Span names | Span kind |
+| --- | --- | --- |
+| Chat request | `ai.chat` | Agent |
+| LangGraph nodes | `agent.route_intent`, `agent.fetch_finance`, `agent.fetch_rag`, `agent.generate` | Chain, Tool, Retriever, Agent |
+| Ollama | `ollama.generate`, `ollama.generate_stream`, `ollama.embed` | LLM |
+| Qdrant | `qdrant.search`, `qdrant.upsert` | Retriever |
+| LangGraph runtime | Auto-instrumented via OpenInference LangChain | Agent |
+
+Chat requests attach session metadata (`user_id`, locale, message length) using Phoenix context helpers.
+
+Configuration:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PHOENIX_ENABLED` | `true` | Toggle trace export |
+| `PHOENIX_PROJECT_NAME` | `banviro` | Project name in the Phoenix UI |
+| `PHOENIX_COLLECTOR_ENDPOINT` | `http://localhost:4317` | OTLP collector (gRPC) |
+| `PHOENIX_COLLECTOR_PROTOCOL` | `grpc` | OTLP transport (`grpc` or `http/protobuf`) |
+| `PHOENIX_ENDPOINT` | `http://localhost:6006` | Phoenix UI (traces dashboard) |
+
+Set `PHOENIX_ENABLED=false` in tests or CI when Phoenix is not available.
 
 ### Intent routing
 
@@ -179,10 +205,10 @@ chmod +x scripts/e2e-ai.sh
 - Streaming chat UI in the dashboard
 - Transaction indexing on create, update, and delete
 - LLM-based intent routing with keyword fallback
+- Phoenix OpenTelemetry instrumentation (agent, Ollama, Qdrant)
 
 **Planned**
 
-- Phoenix OpenTelemetry instrumentation across agent nodes
 - Standalone MCP protocol server (FastMCP)
 - Production deployment (Vercel, Fly.io or Railway, Supabase)
 - Subscription billing and multi-factor authentication
