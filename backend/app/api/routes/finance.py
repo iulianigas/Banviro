@@ -1,8 +1,9 @@
 from datetime import date, datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload
 
+from app.ai.rag.indexer import schedule_transaction_index, schedule_transaction_removal
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.budget import Budget
@@ -141,6 +142,7 @@ def list_transactions(
 @router.post("/transactions", response_model=TransactionRead, status_code=status.HTTP_201_CREATED)
 def create_transaction(
     payload: TransactionCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Transaction:
@@ -163,6 +165,8 @@ def create_transaction(
     db.commit()
     db.refresh(transaction)
 
+    background_tasks.add_task(schedule_transaction_index, transaction.id, current_user.id)
+
     return (
         db.query(Transaction)
         .options(joinedload(Transaction.category))
@@ -174,6 +178,7 @@ def create_transaction(
 @router.delete("/transactions/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_transaction(
     transaction_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> None:
@@ -185,6 +190,7 @@ def delete_transaction(
     if transaction is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
 
+    background_tasks.add_task(schedule_transaction_removal, transaction_id)
     db.delete(transaction)
     db.commit()
 

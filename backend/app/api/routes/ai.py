@@ -64,4 +64,25 @@ async def ai_status() -> dict[str, object]:
         "ollama_available": await ollama_client.is_available(),
         "qdrant_available": await qdrant_retriever.is_available(),
         "model": settings.ollama_model,
+        "embed_model": settings.ollama_embed_model,
+        "agent": "langgraph",
     }
+
+
+class ReindexResponse(BaseModel):
+    indexed: int
+
+
+@router.post("/reindex", response_model=ReindexResponse)
+async def reindex_transactions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ReindexResponse:
+    from app.ai.rag.indexer import reindex_user_transactions
+    from app.config import settings
+
+    if not settings.ai_enabled:
+        return ReindexResponse(indexed=0)
+
+    indexed = await reindex_user_transactions(db, current_user.id)
+    return ReindexResponse(indexed=indexed)

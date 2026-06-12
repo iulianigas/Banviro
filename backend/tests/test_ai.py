@@ -9,3 +9,4 @@ def test_ai_status() -> None:
     data = response.json()
     assert "ai_enabled" in data
     assert "ollama_available" in data
+    assert data.get("agent") == "langgraph"

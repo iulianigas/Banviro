@@ -14,12 +14,14 @@ class Settings(BaseSettings):
     # AI layer ($0 stack)
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.2:1b"
+    ollama_embed_model: str = "nomic-embed-text"
     ollama_timeout_seconds: int = 120
     ollama_num_predict: int = 200
     ollama_keep_alive: str = "30m"
     ollama_temperature: float = 0.2
     qdrant_url: str = "http://localhost:6333"
     qdrant_collection: str = "banviro_transactions"
+    qdrant_vector_size: int = 768
     ai_enabled: bool = True
     phoenix_endpoint: str = "http://localhost:6006"
 

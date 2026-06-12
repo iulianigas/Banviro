@@ -1,3 +1,13 @@
+from datetime import date
+
+from sqlalchemy.orm import Session
+
+from app.i18n.categories import display_category_name
+from app.services.analytics import get_budget_progress, get_summary_stats, list_user_transactions
+
+FINANCE_TOOL_NAMES = ("get_summary", "list_transactions", "get_budgets")
+
+
 def get_finance_tool_definitions() -> list[dict[str, str]]:
     return [
         {
@@ -13,3 +23,118 @@ def get_finance_tool_definitions() -> list[dict[str, str]]:
             "description": "Returnează progresul bugetelor lunare pe categorii.",
         },
     ]
+
+
+def run_get_summary(db: Session, user_id: int, locale: str) -> str:
+    summary = get_summary_stats(db, user_id)
+    if locale == "en":
+        return (
+            f"Total balance: {summary.balance} RON. "
+            f"Current month income: {summary.month_income} RON. "
+            f"Current month expenses: {summary.month_expenses} RON. "
+            f"Current month savings: {summary.month_savings} RON."
+        )
+    return (
+        f"Sold total: {summary.balance} RON. "
+        f"Venituri luna curentă: {summary.month_income} RON. "
+        f"Cheltuieli luna curentă: {summary.month_expenses} RON. "
+        f"Economii luna curentă: {summary.month_savings} RON."
+    )
+
+
+def run_list_transactions(db: Session, user_id: int, locale: str, limit: int = 5) -> str:
+    transactions = list_user_transactions(db, user_id, limit=limit)
+    if not transactions:
+        return "No recent transactions." if locale == "en" else "Nicio tranzacție recentă."
+
+    lines = []
+    for tx in transactions:
+        category_label = display_category_name(tx.category.name, tx.category.slug, locale)
+        lines.append(
+            f"- {tx.transaction_date} | {tx.type.value} | {category_label} | "
+            f"{tx.amount} RON | {tx.description or ''}"
+        )
+    return "\n".join(lines)
+
+
+def run_get_budgets(db: Session, user_id: int, locale: str) -> str:
+    today = date.today()
+    budgets = get_budget_progress(db, user_id, today.month, today.year)
+    if not budgets:
+        return (
+            "No budgets set for the current month."
+            if locale == "en"
+            else "Niciun buget setat pentru luna curentă."
+        )
+
+    lines = []
+    for budget in budgets:
+        category_label = display_category_name(
+            budget.category_name,
+            budget.category_slug,
+            locale,
+        )
+        if locale == "en":
+            lines.append(
+                f"- {category_label}: spent {budget.spent_amount}/{budget.budget_amount} RON "
+                f"({budget.usage_percent}% used, {budget.remaining_amount} RON left)"
+            )
+        else:
+            lines.append(
+                f"- {category_label}: cheltuit {budget.spent_amount}/{budget.budget_amount} RON "
+                f"({budget.usage_percent}% utilizat, {budget.remaining_amount} RON rămas)"
+            )
+    return "\n".join(lines)
+
+
+def finance_tools_for_message(message: str) -> list[str]:
+    lowered = message.lower()
+    tools: list[str] = []
+
+    finance_keywords = (
+        "cheltui",
+        "spend",
+        "venit",
+        "income",
+        "sold",
+        "balance",
+        "bani",
+        "money",
+        "econom",
+        "saving",
+        "luna",
+        "month",
+        "categorie",
+        "category",
+        "tranzac",
+        "transaction",
+        "suma",
+        "amount",
+    )
+    budget_keywords = ("buget", "budget")
+
+    if any(word in lowered for word in finance_keywords):
+        tools.extend(["get_summary", "list_transactions"])
+
+    if any(word in lowered for word in budget_keywords):
+        if "get_budgets" not in tools:
+            tools.append("get_budgets")
+
+    return tools
+
+
+def execute_finance_tool(
+    tool_name: str,
+    db: Session,
+    user_id: int,
+    locale: str,
+) -> str:
+    runners = {
+        "get_summary": run_get_summary,
+        "list_transactions": run_list_transactions,
+        "get_budgets": run_get_budgets,
+    }
+    runner = runners.get(tool_name)
+    if runner is None:
+        raise ValueError(f"Unknown finance tool: {tool_name}")
+    return runner(db, user_id, locale)

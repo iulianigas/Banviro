@@ -18,6 +18,25 @@ class OllamaClient:
         except httpx.HTTPError:
             return False
 
+    async def embed(self, text: str) -> list[float]:
+        payload = {
+            "model": settings.ollama_embed_model,
+            "input": text,
+        }
+        try:
+            async with httpx.AsyncClient(timeout=float(self.timeout)) as client:
+                response = await client.post(f"{self.base_url}/api/embed", json=payload)
+                response.raise_for_status()
+                data = response.json()
+                embeddings = data.get("embeddings")
+                if isinstance(embeddings, list) and embeddings:
+                    return [float(value) for value in embeddings[0]]
+        except httpx.HTTPError as exc:
+            ai_logger.error("ollama embed failed: %s", exc)
+            raise RuntimeError(f"Eroare embedding Ollama: {exc}") from exc
+
+        raise RuntimeError("Ollama embed response missing embeddings")
+
     async def generate(self, system: str, prompt: str) -> str:
         payload = {
             "model": self.model,
