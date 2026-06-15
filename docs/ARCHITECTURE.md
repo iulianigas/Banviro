@@ -18,12 +18,12 @@ This document describes the system design of Banviro: a personal finance platfor
 | Agent orchestrator | Route intent, invoke tools, retrieve context, generate replies | LangGraph, FastAPI | Complete |
 | RAG pipeline | Semantic search over transaction history | Qdrant, Ollama embeddings | Complete |
 | LLM | Chat completion and intent routing | Ollama (`llama3.2:3b`, `nomic-embed-text`) | Complete |
-| Tool layer | Structured access to finance data | Python MCP-style tools, LLM routing | Partial |
+| Tool layer | Structured access to finance data | MCP protocol server (FastMCP), LLM routing | Implemented |
 | Data | Persistent application state | PostgreSQL 16 | Complete |
 | Deployment | Containers, CI, production hosting | Docker Compose, GitHub Actions | Partial |
 | Observability | Tracing and monitoring for AI and API | Phoenix OpenTelemetry | Complete |
 
-The tool layer is **partial** because finance tools are implemented as in-process Python functions rather than a standalone MCP server.
+Finance tools are shared between the LangGraph agent (in-process) and the standalone MCP server (`backend/run_mcp.py`).
 
 ## High-level diagram
 
@@ -206,9 +206,9 @@ chmod +x scripts/e2e-ai.sh
 - Transaction indexing on create, update, and delete
 - LLM-based intent routing with keyword fallback
 - Phoenix OpenTelemetry instrumentation (agent, Ollama, Qdrant)
+- Standalone MCP protocol server (FastMCP) for external clients
 
 **Planned**
 
-- Standalone MCP protocol server (FastMCP)
 - Production deployment (Vercel, Fly.io or Railway, Supabase)
 - Subscription billing and multi-factor authentication

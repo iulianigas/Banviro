@@ -40,7 +40,10 @@ jobs:
           cache-dependency-path: backend/requirements.txt
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          pip install fastmcp==3.4.2
+          pip install 'starlette==0.46.2' 'uvicorn[standard]==0.34.2' 'python-multipart==0.0.20'
 
       - name: Run migrations
         env:

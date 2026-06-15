@@ -1,0 +1,2 @@
+# Optional MCP server — use scripts/install-mcp.sh (installs this after requirements.txt)
+fastmcp==3.4.2

@@ -35,7 +35,7 @@ For a detailed architecture breakdown, see [docs/ARCHITECTURE.md](docs/ARCHITECT
 
 ```
 banviro/
-├── backend/              # FastAPI application
+├── backend/              # FastAPI application + MCP server
 ├── frontend/             # Next.js web application
 ├── docs/                 # Architecture and design notes
 ├── scripts/              # Operational and test scripts
@@ -66,6 +66,7 @@ cp .env.example .env
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+sh scripts/install-mcp.sh   # optional — only for MCP server (run_mcp.py)
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
@@ -117,6 +118,38 @@ docker exec -it banviro-ollama ollama pull nomic-embed-text
 Set `AI_ENABLED=true` in `backend/.env` to enable AI features.
 
 Ensure Phoenix is running to collect traces (`docker compose -f docker-compose.yml -f docker-compose.ai.yml up -d phoenix`). Traces appear at http://localhost:6006 under the **banviro** project → **Tracing** tab. Send a chat message first, then refresh the trace list.
+
+### 5. MCP server (optional)
+
+Expose Banviro finance tools to external MCP clients (Cursor, Claude Desktop, etc.).
+
+1. Log in via the API and copy your access token:
+
+```bash
+curl -s -X POST http://localhost:8000/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"you@example.com","password":"your-password"}' | jq -r .access_token
+```
+
+2. Run the MCP server (stdio — default for desktop clients):
+
+```bash
+cd backend
+source .venv/bin/activate
+sh scripts/install-mcp.sh   # if not installed yet
+export BANVIRO_ACCESS_TOKEN="<access_token>"
+python run_mcp.py
+```
+
+HTTP transport (remote clients):
+
+```bash
+python run_mcp.py --transport http --port 8001
+```
+
+**Tools:** `get_summary`, `list_transactions`, `get_budgets`, `get_spending_by_category` (optional `month`, `year`, `locale`).
+
+See `backend/mcp.cursor.example.json` for a Cursor configuration template.
 
 ## Testing
 
@@ -193,7 +226,7 @@ All finance and AI routes require a valid Bearer token.
 - [x] LangGraph agent with finance tools and Qdrant RAG
 - [x] Streaming AI chat in the dashboard
 - [x] Phoenix OpenTelemetry instrumentation
-- [ ] MCP protocol server
+- [x] MCP protocol server
 - [ ] Production deployment pipeline
 - [ ] Subscriptions and enhanced security (MFA)
 

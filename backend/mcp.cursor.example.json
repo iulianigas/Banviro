@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "banviro": {
+      "command": "/Users/iulianigas/personal/Banviro/backend/.venv/bin/python",
+      "args": ["/Users/iulianigas/personal/Banviro/backend/run_mcp.py"],
+      "env": {
+        "DATABASE_URL": "postgresql://banviro:banviro@localhost:5432/banviro",
+        "SECRET_KEY": "change-me-to-a-long-random-secret-key",
+        "BANVIRO_ACCESS_TOKEN": "paste-only-access_token-here"
+      }
+    }
+  }
+}

@@ -39,8 +39,21 @@ def get_finance_tool_definitions() -> list[dict[str, str]]:
     ]
 
 
-def run_get_summary(db: Session, user_id: int, locale: str) -> str:
-    summary = get_summary_stats(db, user_id)
+def _target_month_year(month: int | None, year: int | None) -> tuple[int, int]:
+    today = date.today()
+    return month or today.month, year or today.year
+
+
+def run_get_summary(
+    db: Session,
+    user_id: int,
+    locale: str,
+    *,
+    month: int | None = None,
+    year: int | None = None,
+) -> str:
+    target_month, target_year = _target_month_year(month, year)
+    summary = get_summary_stats(db, user_id, target_month, target_year)
     if locale == "en":
         return (
             f"Total balance: {summary.balance} RON. "
@@ -56,14 +69,22 @@ def run_get_summary(db: Session, user_id: int, locale: str) -> str:
     )
 
 
-def run_list_transactions(db: Session, user_id: int, locale: str, limit: int = 20) -> str:
-    today = date.today()
+def run_list_transactions(
+    db: Session,
+    user_id: int,
+    locale: str,
+    limit: int = 20,
+    *,
+    month: int | None = None,
+    year: int | None = None,
+) -> str:
+    target_month, target_year = _target_month_year(month, year)
     transactions = list_user_transactions(
         db,
         user_id,
         limit=limit,
-        month=today.month,
-        year=today.year,
+        month=target_month,
+        year=target_year,
     )
     if not transactions:
         return "No recent transactions." if locale == "en" else "Nicio tranzacție recentă."
@@ -78,9 +99,16 @@ def run_list_transactions(db: Session, user_id: int, locale: str, limit: int = 2
     return "\n".join(lines)
 
 
-def run_get_budgets(db: Session, user_id: int, locale: str) -> str:
-    today = date.today()
-    budgets = get_budget_progress(db, user_id, today.month, today.year)
+def run_get_budgets(
+    db: Session,
+    user_id: int,
+    locale: str,
+    *,
+    month: int | None = None,
+    year: int | None = None,
+) -> str:
+    target_month, target_year = _target_month_year(month, year)
+    budgets = get_budget_progress(db, user_id, target_month, target_year)
     if not budgets:
         return (
             "No budgets set for the current month."
@@ -108,9 +136,16 @@ def run_get_budgets(db: Session, user_id: int, locale: str) -> str:
     return "\n".join(lines)
 
 
-def run_get_spending_by_category(db: Session, user_id: int, locale: str) -> str:
-    today = date.today()
-    breakdown = get_spending_by_category(db, user_id, today.month, today.year)
+def run_get_spending_by_category(
+    db: Session,
+    user_id: int,
+    locale: str,
+    *,
+    month: int | None = None,
+    year: int | None = None,
+) -> str:
+    target_month, target_year = _target_month_year(month, year)
+    breakdown = get_spending_by_category(db, user_id, target_month, target_year)
     if not breakdown:
         return (
             "No category spending for the current month."
