@@ -84,16 +84,3 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: http://localhost:8000
         run: npm run build
-
-  # Deploy placeholder — configure secrets and target platform in phase 2
-  deploy:
-    runs-on: ubuntu-latest
-    needs: [backend, frontend]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Deploy placeholder
-        run: |
-          echo "CI passed. Add deploy steps here (Railway, Fly.io, Vercel, etc.)."

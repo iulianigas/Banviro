@@ -169,6 +169,22 @@ chmod +x scripts/e2e-ai.sh
 
 CI runs on every push and pull request to `main` and `develop`.
 
+## Production deployment
+
+Pushes to `main` that pass CI trigger the **Deploy** workflow (`.github/workflows/deploy.yml`):
+
+1. Build and push backend image to `ghcr.io/<owner>/banviro-api`
+2. Optionally deploy frontend to **Vercel** and redeploy backend on **Railway**
+
+Full setup (secrets, variables, database, CORS): **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**
+
+Quick local production smoke test:
+
+```bash
+export POSTGRES_PASSWORD=your-secure-password
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
 ## API reference
 
 Base path: `/api/v1`
@@ -227,7 +243,7 @@ All finance and AI routes require a valid Bearer token.
 - [x] Streaming AI chat in the dashboard
 - [x] Phoenix OpenTelemetry instrumentation
 - [x] MCP protocol server
-- [ ] Production deployment pipeline
+- [x] Production deployment pipeline
 - [ ] Subscriptions and enhanced security (MFA)
 
 ## License
