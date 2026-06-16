@@ -46,7 +46,8 @@ export default function DashboardPage() {
   const [budgets, setBudgets] = useState<BudgetProgress[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [period, setPeriod] = useState<PeriodFilter>(getCurrentPeriod);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadDashboard = useCallback(async (token: string, selectedPeriod: PeriodFilter) => {
@@ -81,7 +82,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const token = getAccessToken();
     if (!token) {
-      setLoading(false);
+      setInitialLoading(false);
       router.replace("/login");
       return;
     }
@@ -95,7 +96,7 @@ export default function DashboardPage() {
           router.replace("/login");
         }
       })
-      .finally(() => setLoading(false));
+      .finally(() => setInitialLoading(false));
   }, [loadDashboard, period, router, locale]);
 
   function handleLogout() {
@@ -106,18 +107,18 @@ export default function DashboardPage() {
   function handleRefresh() {
     const token = getAccessToken();
     if (!token) return;
-    setLoading(true);
+    setRefreshing(true);
     setError(null);
     loadDashboard(token, period)
       .catch((err) => {
         setError(err instanceof Error ? err.message : t("dashboard.reloadError"));
       })
-      .finally(() => setLoading(false));
+      .finally(() => setRefreshing(false));
   }
 
   const periodLabel = formatPeriodLabel(period, locale);
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <main className="flex min-h-screen items-center justify-center">
         <p className="text-slate-600">{t("dashboard.loading")}</p>
@@ -163,6 +164,9 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-bold text-slate-900">
             {t("dashboard.welcome", { name: user.full_name ?? user.email })}
           </h1>
+          {refreshing ? (
+            <p className="mt-1 text-sm text-slate-500">{t("dashboard.refreshing")}</p>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <LanguageSelector />

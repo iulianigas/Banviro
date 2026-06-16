@@ -14,11 +14,20 @@ This guide covers the GitHub Actions CD pipeline and how to wire Banviro to mana
 ## CI / CD flow
 
 ```
-push/PR → CI (test + build) → on main success → Deploy workflow
+develop → push/PR → CI only (tests + build)
+main    → push/PR → CI → Deploy workflow → production
 ```
 
 - **CI** (`.github/workflows/ci.yml`) — tests backend, lints/builds frontend on `main` and `develop`.
-- **Deploy** (`.github/workflows/deploy.yml`) — runs after CI passes on `main`, or manually via **Actions → Deploy → Run workflow**.
+- **Deploy** (`.github/workflows/deploy.yml`) — runs **only after CI passes on `main`**, or manually from `main` via **Actions → Deploy → Run workflow**.
+
+Pushes to `develop` never deploy to production.
+
+### Vercel branch settings
+
+1. Vercel → project → **Settings → Git**
+2. **Production Branch**: `main`
+3. Other branches (e.g. `develop`) get **Preview** URLs only — not banviro.vercel.app
 
 Deploy always:
 
@@ -60,7 +69,7 @@ Optional steps (controlled by repository **variables**):
 | `SECRET_KEY` | long random string |
 | `CORS_ORIGINS` | `https://your-app.vercel.app` |
 | `ENVIRONMENT` | `production` |
-| `AI_ENABLED` | `false` (until Ollama/Qdrant are hosted) |
+| `AI_ENABLED` | `false` until Ollama + Qdrant are hosted (see below) |
 | `SALTEDGE_APP_ID` | From Salt Edge dashboard |
 | `SALTEDGE_SECRET` | From Salt Edge dashboard |
 | `SALTEDGE_RETURN_TO_URL` | `https://your-app.vercel.app/integrations/revolut/complete` |
@@ -129,6 +138,51 @@ curl https://your-api.example.com/api/v1/health
 ```
 
 Register/login via the Vercel frontend URL and confirm dashboard loads.
+
+## AI chatbot in production
+
+The dashboard chatbot needs **Ollama** (LLM) and **Qdrant** (vector search) reachable from Railway. They do not run on Vercel or the default Railway API container.
+
+### Why it shows "offline"
+
+| Check | Cause |
+| --- | --- |
+| `AI_ENABLED=false` on Railway | Chat disabled in config |
+| `OLLAMA_BASE_URL` points to `localhost` | Railway cannot reach your Mac |
+| Ollama / Qdrant not deployed | No AI infrastructure in prod |
+
+### Enable AI in production
+
+**Option A — VPS (recommended for Banviro's current stack)**
+
+On a small VPS (e.g. Hetzner, DigitalOcean):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.ai.yml up -d ollama qdrant
+docker exec banviro-ollama ollama pull llama3.2:3b
+docker exec banviro-ollama ollama pull nomic-embed-text
+```
+
+Expose ports `11434` (Ollama) and `6333` (Qdrant) with firewall / HTTPS reverse proxy, then on **Railway**:
+
+```
+AI_ENABLED=true
+OLLAMA_BASE_URL=https://your-vps.example.com/ollama   # or http://IP:11434 if private
+QDRANT_URL=https://your-vps.example.com/qdrant          # or http://IP:6333
+PHOENIX_ENABLED=false
+```
+
+**Option B — keep AI local only**
+
+Leave `AI_ENABLED=false` in production; use AI only when running backend + `docker-compose.ai.yml` locally.
+
+After changing Railway variables, redeploy the API service and verify:
+
+```bash
+curl https://your-api.example.com/api/v1/ai/status
+```
+
+`ollama_available` and `qdrant_available` must be `true` for the chatbot to show as online.
 
 ## Troubleshooting
 

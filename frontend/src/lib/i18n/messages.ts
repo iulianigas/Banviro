@@ -43,6 +43,7 @@ export const messages = {
       welcome: "Bun venit, {name}",
       logout: "Deconectare",
       loading: "Se încarcă dashboard-ul...",
+      refreshing: "Se actualizează datele...",
       unavailable: "Dashboard indisponibil",
       loadError: "Nu am putut încărca datele dashboard-ului",
       loadHint:
@@ -176,6 +177,7 @@ export const messages = {
       welcome: "Welcome, {name}",
       logout: "Log out",
       loading: "Loading dashboard...",
+      refreshing: "Refreshing data...",
       unavailable: "Dashboard unavailable",
       loadError: "Could not load dashboard data",
       loadHint: "Data did not load. Check that the backend is running and DB migrations are applied.",

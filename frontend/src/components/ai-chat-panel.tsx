@@ -55,6 +55,9 @@ export function AiChatPanel({ accessToken, periodLabel }: AiChatPanelProps) {
   }, []);
 
   useEffect(() => {
+    if (messages.length === 0 && !loading) {
+      return;
+    }
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 

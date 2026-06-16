@@ -170,6 +170,24 @@ chmod +x scripts/e2e-ai.sh
 
 CI runs on every push and pull request to `main` and `develop`.
 
+## Git workflow
+
+| Branch | Purpose |
+| --- | --- |
+| `develop` | Day-to-day development — push here; CI runs, **no production deploy** |
+| `main` | Production — merge from `develop` when ready; triggers deploy to Vercel + Railway |
+
+```bash
+git checkout develop
+# ... work, commit, push ...
+git push origin develop
+
+# When ready for production:
+git checkout main && git merge develop && git push origin main
+```
+
+Set **Vercel → Settings → Git → Production Branch** to `main` so preview deploys use other branches only.
+
 ## Production deployment
 
 Pushes to `main` that pass CI trigger the **Deploy** workflow (`.github/workflows/deploy.yml`):
