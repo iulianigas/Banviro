@@ -61,6 +61,11 @@ Optional steps (controlled by repository **variables**):
 | `CORS_ORIGINS` | `https://your-app.vercel.app` |
 | `ENVIRONMENT` | `production` |
 | `AI_ENABLED` | `false` (until Ollama/Qdrant are hosted) |
+| `SALTEDGE_APP_ID` | From Salt Edge dashboard |
+| `SALTEDGE_SECRET` | From Salt Edge dashboard |
+| `SALTEDGE_RETURN_TO_URL` | `https://your-app.vercel.app/integrations/revolut/complete` |
+
+See **[docs/REVOLUT_SALTEDGE.md](REVOLUT_SALTEDGE.md)** for Open Banking setup and troubleshooting.
 
 4. Railway sets `PORT` automatically — the Docker entrypoint uses it.
 
@@ -134,6 +139,7 @@ Register/login via the Vercel frontend URL and confirm dashboard loads.
 | Frontend can’t reach API | `NEXT_PUBLIC_API_URL`, CORS, HTTPS |
 | GHCR pull denied | Package permissions / public visibility |
 | AI offline in prod | Expected if `AI_ENABLED=false` or Ollama not hosted |
+| Revolut connect fails | `SALTEDGE_*` vars set? Migrations 006–007 applied? See [REVOLUT_SALTEDGE.md](REVOLUT_SALTEDGE.md) |
 
 ## Security checklist
 

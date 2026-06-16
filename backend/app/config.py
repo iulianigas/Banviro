@@ -11,6 +11,12 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
     environment: str = "development"
 
+    # Open Banking (Salt Edge)
+    saltedge_base_url: str = "https://www.saltedge.com/api/v6"
+    saltedge_app_id: str | None = None
+    saltedge_secret: str | None = None
+    saltedge_return_to_url: str = "http://localhost:3000/integrations/revolut/complete"
+
     # AI layer
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.2:3b"

@@ -12,6 +12,7 @@ Banviro helps users track income and expenses, monitor budgets by category, and 
 - Transaction and category management
 - Monthly budgets with progress tracking
 - Analytics: balance, spending breakdown, monthly and balance trends
+- **Revolut import** via Salt Edge Open Banking (Romania, AIS) — see [docs/REVOLUT_SALTEDGE.md](docs/REVOLUT_SALTEDGE.md)
 - AI chat with LangGraph orchestration, finance tools, Qdrant RAG, and SSE streaming
 
 ## Technology
@@ -209,8 +210,11 @@ Base path: `/api/v1`
 | POST | `/ai/chat` | AI chat (synchronous) |
 | POST | `/ai/chat/stream` | AI chat (Server-Sent Events) |
 | POST | `/ai/reindex` | Rebuild Qdrant index for the current user |
+| POST | `/integrations/revolut/connect` | Start Salt Edge connect (returns `connect_url`) |
+| POST | `/integrations/revolut/complete` | Finalize bank connection after Salt Edge redirect |
+| POST | `/integrations/revolut/sync` | Import Revolut transactions into Banviro |
 
-All finance and AI routes require a valid Bearer token.
+All finance, AI, and integration routes require a valid Bearer token.
 
 ## Configuration
 
@@ -229,6 +233,9 @@ All finance and AI routes require a valid Bearer token.
 | `PHOENIX_PROJECT_NAME` | Phoenix project name (default: `banviro`) |
 | `PHOENIX_COLLECTOR_ENDPOINT` | OTLP collector URL (default: `http://localhost:4317`) |
 | `PHOENIX_COLLECTOR_PROTOCOL` | OTLP protocol: `grpc` or `http/protobuf` |
+| `SALTEDGE_APP_ID` | Salt Edge App ID (Open Banking) |
+| `SALTEDGE_SECRET` | Salt Edge Secret |
+| `SALTEDGE_RETURN_TO_URL` | Frontend URL after Salt Edge consent (see [docs/REVOLUT_SALTEDGE.md](docs/REVOLUT_SALTEDGE.md)) |
 
 **Frontend** — `frontend/.env.local`
 
@@ -244,7 +251,9 @@ All finance and AI routes require a valid Bearer token.
 - [x] Phoenix OpenTelemetry instrumentation
 - [x] MCP protocol server
 - [x] Production deployment pipeline
+- [x] Revolut import via Salt Edge Open Banking (MVP)
 - [ ] Subscriptions and enhanced security (MFA)
+- [ ] Scheduled bank sync and category mapping for imports
 
 ## License
 

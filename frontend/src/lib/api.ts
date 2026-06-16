@@ -330,6 +330,32 @@ export type ChatStreamHandlers = {
   onError?: (error: Error) => void;
 };
 
+export async function startRevolutConnect(accessToken: string): Promise<{ connect_url: string }> {
+  const response = await fetch(`${API_URL}/api/v1/integrations/revolut/connect`, {
+    method: "POST",
+    headers: authHeaders(accessToken),
+  });
+  return parseResponse<{ connect_url: string }>(response);
+}
+
+export async function completeRevolutConnect(accessToken: string): Promise<{ status: string }> {
+  const response = await fetch(`${API_URL}/api/v1/integrations/revolut/complete`, {
+    method: "POST",
+    headers: authHeaders(accessToken),
+  });
+  return parseResponse<{ status: string }>(response);
+}
+
+export async function syncRevolutTransactions(
+  accessToken: string
+): Promise<{ created: number; skipped: number }> {
+  const response = await fetch(`${API_URL}/api/v1/integrations/revolut/sync`, {
+    method: "POST",
+    headers: authHeaders(accessToken),
+  });
+  return parseResponse<{ created: number; skipped: number }>(response);
+}
+
 export async function getAiStatus(): Promise<AiStatus> {
   const response = await fetch(`${API_URL}/api/v1/ai/status`);
   return parseResponse<AiStatus>(response);
