@@ -13,13 +13,13 @@ export default function RevolutCompletePage() {
   const [detail, setDetail] = useState<string>("Se finalizează conexiunea...");
 
   useEffect(() => {
-    const token = getAccessToken();
-    if (!token) {
+    const accessToken = getAccessToken();
+    if (!accessToken) {
       router.replace("/login");
       return;
     }
 
-    async function finalize() {
+    async function finalize(token: string) {
       try {
         await completeRevolutConnect(token);
         const result = await syncRevolutTransactions(token);
@@ -31,7 +31,7 @@ export default function RevolutCompletePage() {
       }
     }
 
-    void finalize();
+    void finalize(accessToken);
   }, [router]);
 
   return (
